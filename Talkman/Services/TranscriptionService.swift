@@ -86,19 +86,24 @@ final class TranscriptionService {
         guard let asrBox, let ctcBox else { return }
 
         let brandNames = textReplacement.replacements
-        guard !brandNames.isEmpty else {
+        let boostWords = textReplacement.boostWords
+        guard !brandNames.isEmpty || !boostWords.isEmpty else {
             asrBox.value.disableVocabularyBoosting()
             return
         }
 
         // Convert brand names to CustomVocabularyTerms
-        // The "from" key is an alias, the "to" value is the correct text
-        let terms = brandNames.map { from, to in
+        var terms = brandNames.map { from, to in
             CustomVocabularyTerm(
                 text: to,
                 weight: 10.0,
                 aliases: [from]
             )
+        }
+
+        // Add boost-only words (no alias, just boost the correct spelling)
+        terms += boostWords.map { word in
+            CustomVocabularyTerm(text: word, weight: 10.0)
         }
 
         let vocabContext = CustomVocabularyContext(terms: terms)

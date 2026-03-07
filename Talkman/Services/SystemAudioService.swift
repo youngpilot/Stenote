@@ -24,64 +24,51 @@ final class SystemAudioService {
         fadeTimer?.invalidate()
         didPauseMedia = false
 
+        // Pause media immediately (if nothing is playing, this is a no-op)
+        let wasPaused = mediaRemote.sendCommand(.pause)
+        if wasPaused {
+            didPauseMedia = true
+            logger.info("Paused media playback")
+        }
+
         let deviceID = getDefaultOutputDevice()
         guard deviceID != kAudioObjectUnknown else {
             logger.warning("No default output device found")
-            // Try media pause as fallback even without volume control
-            pauseMediaIfPlaying()
             return
         }
 
         let currentVolume = getVolume(deviceID: deviceID)
         if currentVolume < 0.001 {
-            // Already silent — just pause media
             savedVolume = 0
-            pauseMediaIfPlaying()
             return
         }
 
         savedVolume = currentVolume
-
-        // Fade down, then pause media once silent
-        animateVolume(deviceID: deviceID, from: currentVolume, to: 0) { [weak self] in
-            self?.pauseMediaIfPlaying()
-        }
+        animateVolume(deviceID: deviceID, from: currentVolume, to: 0)
         logger.info("Fading out system audio from \(currentVolume)")
     }
 
-    /// Resume media playback, then fade audio back up
+    /// Resume media playback and fade audio back up
     func resumeAndFadeIn() {
         fadeTimer?.invalidate()
 
-        // Resume media first (while still silent)
-        if didPauseMedia {
-            mediaRemote.sendCommand(.play)
-            didPauseMedia = false
-            logger.info("Resumed media playback")
-        }
-
-        guard let targetVolume = savedVolume, targetVolume > 0.001 else {
-            savedVolume = nil
-            return
-        }
-
         let deviceID = getDefaultOutputDevice()
-        guard deviceID != kAudioObjectUnknown else {
-            savedVolume = nil
-            return
+        let targetVolume = savedVolume ?? 0
+
+        // Restore volume first (so resume isn't silent)
+        if targetVolume > 0.001, deviceID != kAudioObjectUnknown {
+            animateVolume(deviceID: deviceID, from: 0, to: targetVolume)
+            logger.info("Fading in system audio to \(targetVolume)")
         }
-
-        animateVolume(deviceID: deviceID, from: 0, to: targetVolume)
         savedVolume = nil
-        logger.info("Fading in system audio to \(targetVolume)")
-    }
 
-    private func pauseMediaIfPlaying() {
-        mediaRemote.isPlaying { [weak self] playing in
-            guard let self, playing else { return }
-            self.mediaRemote.sendCommand(.pause)
-            self.didPauseMedia = true
-            logger.info("Paused media playback")
+        // Resume media after a short delay so volume has started fading in
+        if didPauseMedia {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+                self?.mediaRemote.sendCommand(.play)
+                logger.info("Resumed media playback")
+            }
+            didPauseMedia = false
         }
     }
 
@@ -156,13 +143,9 @@ private final class MediaRemoteBridge: @unchecked Sendable {
     enum Command: UInt32 {
         case play = 0
         case pause = 1
-        case togglePlayPause = 2
     }
 
-    private typealias IsPlayingFn = @convention(c) (DispatchQueue, @escaping (Bool) -> Void) -> Void
     private typealias SendCommandFn = @convention(c) (UInt32, UnsafeRawPointer?) -> Bool
-
-    private let isPlayingFn: IsPlayingFn?
     private let sendCommandFn: SendCommandFn?
 
     init() {
@@ -170,31 +153,14 @@ private final class MediaRemoteBridge: @unchecked Sendable {
             kCFAllocatorDefault,
             URL(fileURLWithPath: "/System/Library/PrivateFrameworks/MediaRemote.framework") as CFURL
         ) else {
-            isPlayingFn = nil
             sendCommandFn = nil
             return
-        }
-
-        if let ptr = CFBundleGetFunctionPointerForName(bundle, "MRMediaRemoteGetNowPlayingApplicationIsPlaying" as CFString) {
-            isPlayingFn = unsafeBitCast(ptr, to: IsPlayingFn.self)
-        } else {
-            isPlayingFn = nil
         }
 
         if let ptr = CFBundleGetFunctionPointerForName(bundle, "MRMediaRemoteSendCommand" as CFString) {
             sendCommandFn = unsafeBitCast(ptr, to: SendCommandFn.self)
         } else {
             sendCommandFn = nil
-        }
-    }
-
-    func isPlaying(completion: @MainActor @escaping (Bool) -> Void) {
-        guard let fn = isPlayingFn else {
-            Task { @MainActor in completion(false) }
-            return
-        }
-        fn(DispatchQueue.main) { playing in
-            Task { @MainActor in completion(playing) }
         }
     }
 

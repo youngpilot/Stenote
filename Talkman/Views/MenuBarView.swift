@@ -433,7 +433,7 @@ private struct InlineSettingsView: View {
                 .fontWeight(.medium)
 
             HStack(spacing: 4) {
-                TextField("Wrong", text: $newFrom)
+                TextField("Wrong (optional)", text: $newFrom)
                     .textFieldStyle(.roundedBorder)
                     .font(DesignTokens.Font.caption)
                 Image(systemName: "arrow.right")
@@ -443,20 +443,43 @@ private struct InlineSettingsView: View {
                     .textFieldStyle(.roundedBorder)
                     .font(DesignTokens.Font.caption)
                 Button {
-                    guard !newFrom.isEmpty, !newTo.isEmpty else { return }
-                    replacementService.addReplacement(from: newFrom, to: newTo)
+                    guard !newTo.isEmpty else { return }
+                    if newFrom.isEmpty {
+                        replacementService.addBoostWord(newTo)
+                    } else {
+                        replacementService.addReplacement(from: newFrom, to: newTo)
+                    }
                     newFrom = ""
                     newTo = ""
                 } label: {
                     Image(systemName: "plus.circle.fill")
                 }
-                .disabled(newFrom.isEmpty || newTo.isEmpty)
+                .disabled(newTo.isEmpty)
                 .buttonStyle(.plain)
             }
 
-            if !replacementService.replacements.isEmpty {
+            let hasEntries = !replacementService.replacements.isEmpty || !replacementService.boostWords.isEmpty
+            if hasEntries {
                 ScrollView {
                     VStack(spacing: 2) {
+                        // Boost-only words
+                        ForEach(replacementService.boostWords, id: \.self) { word in
+                            HStack(spacing: 4) {
+                                Text(word)
+                                    .fontWeight(.medium)
+                                Spacer()
+                                Button {
+                                    replacementService.removeBoostWord(word)
+                                } label: {
+                                    Image(systemName: "xmark.circle")
+                                        .foregroundStyle(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .font(DesignTokens.Font.caption)
+                        }
+
+                        // Replacement pairs
                         ForEach(
                             replacementService.replacements.sorted(by: { $0.key < $1.key }),
                             id: \.key

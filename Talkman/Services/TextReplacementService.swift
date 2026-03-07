@@ -10,7 +10,13 @@ final class TextReplacementService {
 
     /// Maps lowercased phonetic/ASR output → correct brand name
     /// e.g. "antropic" → "Anthropic", "open ai" → "OpenAI"
+    /// Empty key = boost-only (no regex replacement)
     private(set) var replacements: [String: String] = [:]
+
+    /// Brand names added without a "wrong" form — boost only, no regex
+    private(set) var boostWords: [String] = []
+
+    private let boostStorageKey = "boostWords"
 
     private init() {
         load()
@@ -21,9 +27,21 @@ final class TextReplacementService {
         save()
     }
 
+    func addBoostWord(_ word: String) {
+        let trimmed = word.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, !boostWords.contains(trimmed) else { return }
+        boostWords.append(trimmed)
+        saveBoostWords()
+    }
+
     func removeReplacement(from: String) {
         replacements.removeValue(forKey: from.lowercased())
         save()
+    }
+
+    func removeBoostWord(_ word: String) {
+        boostWords.removeAll { $0 == word }
+        saveBoostWords()
     }
 
     func applyReplacements(to text: String) -> String {
@@ -55,13 +73,21 @@ final class TextReplacementService {
     // MARK: - Persistence
 
     private func load() {
-        guard let data = UserDefaults.standard.data(forKey: storageKey),
-              let decoded = try? JSONDecoder().decode([String: String].self, from: data)
-        else { return }
-        replacements = decoded
+        if let data = UserDefaults.standard.data(forKey: storageKey),
+           let decoded = try? JSONDecoder().decode([String: String].self, from: data) {
+            replacements = decoded
+        }
+        if let data = UserDefaults.standard.data(forKey: boostStorageKey),
+           let decoded = try? JSONDecoder().decode([String].self, from: data) {
+            boostWords = decoded
+        }
     }
 
     private func save() {
         UserDefaults.standard.set(try? JSONEncoder().encode(replacements), forKey: storageKey)
+    }
+
+    private func saveBoostWords() {
+        UserDefaults.standard.set(try? JSONEncoder().encode(boostWords), forKey: boostStorageKey)
     }
 }
