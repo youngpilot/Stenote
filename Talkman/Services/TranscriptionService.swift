@@ -41,7 +41,9 @@ final class TranscriptionService {
     private var pendingParagraphBreak = false
 
     // Periodic transcription — transcribe every N seconds even without VAD speechEnd
+    // First chunk uses shorter interval so initial words appear quickly
     private let periodicInterval: TimeInterval = 3.0
+    private let firstChunkInterval: TimeInterval = 1.5
     private var lastTranscriptionTime: Date?
     private var isTranscribing_ASR = false  // Guard against overlapping ASR calls
 
@@ -192,10 +194,11 @@ final class TranscriptionService {
 
         // Periodic transcription: if enough audio has accumulated without a VAD speechEnd,
         // transcribe now so text appears while the user is still speaking
+        let interval = segments.isEmpty ? firstChunkInterval : periodicInterval
         if !isTranscribing_ASR,
            accumulatedSamples.count >= 16_000,  // at least 1s of audio
            let lastTime = lastTranscriptionTime,
-           Date().timeIntervalSince(lastTime) >= periodicInterval {
+           Date().timeIntervalSince(lastTime) >= interval {
             await transcribeAccumulated(isMidSpeech: true)
         }
     }
@@ -204,15 +207,14 @@ final class TranscriptionService {
         guard !accumulatedSamples.isEmpty, let asrBox, !isTranscribing_ASR else { return }
 
         isTranscribing_ASR = true
+        defer { isTranscribing_ASR = false }
+
         let samplesToTranscribe = accumulatedSamples
         accumulatedSamples = []
         lastTranscriptionTime = Date()
 
         // Need at least 0.5 seconds of audio (8000 samples at 16kHz)
-        guard samplesToTranscribe.count >= 8_000 else {
-            isTranscribing_ASR = false
-            return
-        }
+        guard samplesToTranscribe.count >= 8_000 else { return }
 
         do {
             let result = try await asrBox.value.transcribe(samplesToTranscribe, source: .microphone)
@@ -229,10 +231,7 @@ final class TranscriptionService {
                     corrected.removeLast()
                 }
                 corrected = corrected.trimmingCharacters(in: .whitespaces)
-                guard !corrected.isEmpty else {
-                    isTranscribing_ASR = false
-                    return
-                }
+                guard !corrected.isEmpty else { return }
             }
 
             // Detect language using NaturalLanguage
@@ -258,7 +257,6 @@ final class TranscriptionService {
         } catch {
             logger.error("Transcription error: \(error)")
         }
-        isTranscribing_ASR = false
     }
 
     func stopTranscription() async -> String {

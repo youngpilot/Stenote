@@ -295,6 +295,13 @@ private struct InlineSettingsView: View {
             ))
             .font(DesignTokens.Font.caption)
 
+            Toggle("Mute Audio While Recording", isOn: Binding(
+                get: { settings.muteAudioDuringRecording },
+                set: { settings.muteAudioDuringRecording = $0 }
+            ))
+            .font(DesignTokens.Font.caption)
+            .help("Mute system audio output during recording to prevent interference, restores when done")
+
             Divider()
 
             // Text Options

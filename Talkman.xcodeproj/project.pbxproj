@@ -22,6 +22,7 @@
 		A10001000000000000000014 /* TextReplacementService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000014 /* TextReplacementService.swift */; };
 		A10001000000000000000015 /* UncheckedSendableBox.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000015 /* UncheckedSendableBox.swift */; };
 		A10001000000000000000016 /* HistoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000016 /* HistoryService.swift */; };
+		A10001000000000000000017 /* SystemAudioService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000017 /* SystemAudioService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +41,7 @@
 		A10002000000000000000014 /* TextReplacementService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextReplacementService.swift; sourceTree = "<group>"; };
 		A10002000000000000000015 /* UncheckedSendableBox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UncheckedSendableBox.swift; sourceTree = "<group>"; };
 		A10002000000000000000016 /* HistoryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryService.swift; sourceTree = "<group>"; };
+		A10002000000000000000017 /* SystemAudioService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioService.swift; sourceTree = "<group>"; };
 		A10002000000000000000018 /* Talkman.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Talkman.entitlements; sourceTree = "<group>"; };
 		A10003000000000000000001 /* Talkman.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Talkman.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -114,6 +116,7 @@
 				A10002000000000000000009 /* RecordingManager.swift */,
 				A10002000000000000000014 /* TextReplacementService.swift */,
 				A10002000000000000000016 /* HistoryService.swift */,
+				A10002000000000000000017 /* SystemAudioService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -223,6 +226,7 @@
 				A10001000000000000000014 /* TextReplacementService.swift in Sources */,
 				A10001000000000000000015 /* UncheckedSendableBox.swift in Sources */,
 				A10001000000000000000016 /* HistoryService.swift in Sources */,
+				A10001000000000000000017 /* SystemAudioService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

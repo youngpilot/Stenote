@@ -125,6 +125,10 @@ final class SettingsStore {
         didSet { UserDefaults.standard.set(autoStopTimeout.rawValue, forKey: "autoStopTimeout") }
     }
 
+    var muteAudioDuringRecording: Bool {
+        didSet { UserDefaults.standard.set(muteAudioDuringRecording, forKey: "muteAudioDuringRecording") }
+    }
+
     var onHotkeyChanged: ((HotkeyChoice) -> Void)?
 
     private init() {
@@ -139,5 +143,6 @@ final class SettingsStore {
             if ud.object(forKey: "autoStopTimeout") == nil { return .thirty }
             return AutoStopOption(rawValue: ud.integer(forKey: "autoStopTimeout")) ?? .thirty
         }()
+        self.muteAudioDuringRecording = ud.bool(forKey: "muteAudioDuringRecording")
     }
 }

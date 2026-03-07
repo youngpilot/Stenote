@@ -15,6 +15,7 @@ final class RecordingManager {
     private let transcriptionService = TranscriptionService()
     private let outputService = OutputService()
     private let hotkeyService = HotkeyService()
+    private let systemAudio = SystemAudioService.shared
     let historyService = HistoryService.shared
 
     private(set) var isRecording = false
@@ -106,6 +107,10 @@ final class RecordingManager {
             needsAccessibility = !AXIsProcessTrusted()
             SoundFeedback.playStart()
 
+            if SettingsStore.shared.muteAudioDuringRecording {
+                systemAudio.muteOutput()
+            }
+
             // Paste prefix text if configured
             let prefix = SettingsStore.shared.prefixText
             if !prefix.isEmpty {
@@ -121,6 +126,7 @@ final class RecordingManager {
         audioCaptureService.stopCapture()
         isRecording = false
         audioLevel = 0.0
+        systemAudio.restoreOutput()
         SoundFeedback.playStop()
 
         // Transcribe remaining audio — the onSegmentReady callback wraps in
