@@ -108,7 +108,7 @@ final class RecordingManager {
             SoundFeedback.playStart()
 
             if SettingsStore.shared.muteAudioDuringRecording {
-                systemAudio.muteOutput()
+                systemAudio.fadeOut()
             }
 
             // Paste prefix text if configured
@@ -126,7 +126,7 @@ final class RecordingManager {
         audioCaptureService.stopCapture()
         isRecording = false
         audioLevel = 0.0
-        systemAudio.restoreOutput()
+        systemAudio.fadeIn()
         SoundFeedback.playStop()
 
         // Transcribe remaining audio — the onSegmentReady callback wraps in
