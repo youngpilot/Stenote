@@ -131,6 +131,17 @@ final class SettingsStore {
 
     var onHotkeyChanged: ((HotkeyChoice) -> Void)?
 
+    func resetToDefaults() {
+        enableITN = true
+        hotkey = .doubleRightCmd
+        politenessMode = false
+        prefixText = ""
+        suffixText = ""
+        vadSensitivity = .normal
+        autoStopTimeout = .thirty
+        muteAudioDuringRecording = false
+    }
+
     private init() {
         let ud = UserDefaults.standard
         self.enableITN = ud.object(forKey: "enableITN") == nil ? true : ud.bool(forKey: "enableITN")

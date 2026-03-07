@@ -44,6 +44,13 @@ final class TextReplacementService {
         saveBoostWords()
     }
 
+    func removeAll() {
+        replacements = [:]
+        boostWords = []
+        save()
+        saveBoostWords()
+    }
+
     func applyReplacements(to text: String) -> String {
         guard !replacements.isEmpty else { return text }
 

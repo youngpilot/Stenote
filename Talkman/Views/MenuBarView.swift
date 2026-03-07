@@ -7,6 +7,7 @@ struct MenuBarView: View {
     @State private var showSettings = false
     @State private var copiedHistoryId: UUID?
     @State private var hoveredHistoryId: UUID?
+    @State private var showResetConfirm = false
 
     var body: some View {
         VStack(spacing: DesignTokens.Spacing.m) {
@@ -25,15 +26,21 @@ struct MenuBarView: View {
 
     @ViewBuilder
     private var mainSection: some View {
-        // Record button + status on same line
-        HStack {
+        // Top bar: Record + Settings + Quit
+        HStack(spacing: 8) {
             Button {
                 recordingManager.toggle()
             } label: {
-                Label(
-                    recordingManager.isRecording ? "Stop Recording" : "Start Recording",
-                    systemImage: recordingManager.isRecording ? "stop.circle.fill" : "mic.circle.fill"
-                )
+                HStack(spacing: 5) {
+                    let icon = recordingManager.isRecording
+                        ? TalkmanApp.micRecordingIcon
+                        : TalkmanApp.micIdleIcon
+                    Image(nsImage: icon)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 14, height: 14)
+                    Text(recordingManager.isRecording ? "Stop" : "Record")
+                }
             }
             .keyboardShortcut("r", modifiers: .command)
             .controlSize(.large)
@@ -41,14 +48,31 @@ struct MenuBarView: View {
 
             Spacer()
 
-            HStack(spacing: 4) {
-                Circle()
-                    .fill(statusColor)
-                    .frame(width: 8, height: 8)
-                Text(statusText)
-                    .font(DesignTokens.Font.caption)
-                    .foregroundStyle(.secondary)
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    showSettings = true
+                }
+            } label: {
+                Image(systemName: "gearshape.fill")
+                    .font(.system(size: 13))
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
             }
+            .keyboardShortcut(",", modifiers: .command)
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+
+            Button {
+                NSApplication.shared.terminate(nil)
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .semibold))
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
+            }
+            .keyboardShortcut("q", modifiers: .command)
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
         }
 
         // Model loading progress
@@ -193,24 +217,26 @@ struct MenuBarView: View {
             }
         }
 
+        // Status bar at the bottom
         Divider()
 
-        HStack {
-            Button("Settings...") {
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    showSettings = true
-                }
+        HStack(spacing: 6) {
+            Circle()
+                .fill(statusColor)
+                .frame(width: 8, height: 8)
+            Text(statusText)
+                .font(DesignTokens.Font.caption)
+                .foregroundStyle(.secondary)
+            if recordingManager.isRecording, !recordingManager.detectedLanguage.isEmpty {
+                Text("·")
+                    .foregroundStyle(.tertiary)
+                Text(recordingManager.detectedLanguage.uppercased())
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.secondary)
             }
-            .keyboardShortcut(",", modifiers: .command)
-
             Spacer()
-
-            Button("Quit") {
-                NSApplication.shared.terminate(nil)
-            }
-            .keyboardShortcut("q", modifiers: .command)
         }
-        .font(DesignTokens.Font.caption)
     }
 
     // MARK: - Settings View
@@ -235,13 +261,51 @@ struct MenuBarView: View {
                 .fontWeight(.medium)
 
             Spacer()
-            // Balance the back button
-            Color.clear.frame(width: 50, height: 1)
+
+            Button {
+                showResetConfirm = true
+            } label: {
+                Image(systemName: "arrow.counterclockwise")
+                    .font(.system(size: 11))
+            }
+            .font(DesignTokens.Font.caption)
+            .controlSize(.small)
+            .help("Restore Defaults")
+        }
+        .alert("Restore Defaults?", isPresented: $showResetConfirm) {
+            Button("Cancel", role: .cancel) {}
+            Button("Restore", role: .destructive) {
+                SettingsStore.shared.resetToDefaults()
+                TextReplacementService.shared.removeAll()
+            }
+        } message: {
+            Text(resetSummary)
         }
 
         Divider()
 
         InlineSettingsView()
+    }
+
+    private var resetSummary: String {
+        var items: [String] = []
+        let s = SettingsStore.shared
+        let r = TextReplacementService.shared
+
+        if s.hotkey != .doubleRightCmd { items.append("Shortcut: \(s.hotkey.label) → Double-press Right ⌘") }
+        if !s.enableITN { items.append("Inverse Text Normalization: off → on") }
+        if s.vadSensitivity != .normal { items.append("Pause sensitivity: \(s.vadSensitivity.label) → Normal") }
+        if s.autoStopTimeout != .thirty { items.append("Auto-stop: \(s.autoStopTimeout.label) → 30s") }
+        if s.muteAudioDuringRecording { items.append("Mute audio: on → off") }
+        if s.politenessMode { items.append("Politeness mode: on → off") }
+        if !s.prefixText.isEmpty { items.append("Prefix: \"\(s.prefixText)\" → empty") }
+        if !s.suffixText.isEmpty { items.append("Suffix: \"\(s.suffixText)\" → empty") }
+
+        let wordCount = r.replacements.count + r.boostWords.count
+        if wordCount > 0 { items.append("\(wordCount) brand name\(wordCount == 1 ? "" : "s") will be removed") }
+
+        if items.isEmpty { return "All settings are already at defaults." }
+        return "This will reset:\n\n" + items.joined(separator: "\n")
     }
 
     // MARK: - Helpers
