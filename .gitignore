@@ -16,3 +16,7 @@ Packages/
 
 # Archive
 archive/
+
+# Claude operational files
+tasks/
+CLAUDE.md

@@ -1,19 +1,27 @@
 import AVFoundation
-import Observation
+import Accelerate
 
-@Observable
-@MainActor
-final class AudioCaptureService {
+final class AudioCaptureService: @unchecked Sendable {
     private var audioEngine: AVAudioEngine?
-    private(set) var isCapturing = false
-    private(set) var audioLevel: Float = 0
+    private var converter: AVAudioConverter?
 
-    private var audioBufferCallback: ((AVAudioPCMBuffer) -> Void)?
+    func startCapture(
+        onBuffer: @escaping @Sendable (AVAudioPCMBuffer) -> Void,
+        onLevel: @escaping @Sendable (Float) -> Void
+    ) throws {
+        // Check microphone permission
+        let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+        NSLog("[AudioCapture] Mic permission status: \(micStatus.rawValue) (0=notDetermined, 1=restricted, 2=denied, 3=authorized)")
+        if micStatus == .notDetermined {
+            AVCaptureDevice.requestAccess(for: .audio) { granted in
+                NSLog("[AudioCapture] Mic permission granted: \(granted)")
+            }
+        }
 
-    func startCapture(onBuffer: @escaping (AVAudioPCMBuffer) -> Void) throws {
         let engine = AVAudioEngine()
         let inputNode = engine.inputNode
         let inputFormat = inputNode.outputFormat(forBus: 0)
+        NSLog("[AudioCapture] Input format: \(inputFormat)")
 
         // Target format: 16kHz mono for Parakeet
         guard let targetFormat = AVAudioFormat(
@@ -25,22 +33,12 @@ final class AudioCaptureService {
             throw AudioCaptureError.formatError
         }
 
-        guard let converter = AVAudioConverter(from: inputFormat, to: targetFormat) else {
+        guard let conv = AVAudioConverter(from: inputFormat, to: targetFormat) else {
             throw AudioCaptureError.converterError
         }
+        converter = conv
 
-        audioBufferCallback = onBuffer
-
-        inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
-            guard let self else { return }
-
-            // Update audio level for UI
-            let level = buffer.floatChannelData?[0].pointee ?? 0
-            Task { @MainActor in
-                self.audioLevel = abs(level)
-            }
-
-            // Convert to 16kHz mono
+        inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { buffer, _ in
             let frameCapacity = AVAudioFrameCount(
                 Double(buffer.frameLength) * targetFormat.sampleRate / inputFormat.sampleRate
             )
@@ -50,12 +48,23 @@ final class AudioCaptureService {
             ) else { return }
 
             var error: NSError?
-            converter.convert(to: convertedBuffer, error: &error) { _, outStatus in
+            conv.convert(to: convertedBuffer, error: &error) { _, outStatus in
                 outStatus.pointee = .haveData
                 return buffer
             }
 
             if error == nil {
+                // Compute RMS level from converted buffer
+                if let floatData = convertedBuffer.floatChannelData {
+                    let count = Int(convertedBuffer.frameLength)
+                    if count > 0 {
+                        var rms: Float = 0
+                        vDSP_rmsqv(floatData[0], 1, &rms, vDSP_Length(count))
+                        // Normalize to 0.0-1.0 range (typical speech RMS ~0.01-0.15)
+                        let level = min(rms * 8.0, 1.0)
+                        onLevel(level)
+                    }
+                }
                 onBuffer(convertedBuffer)
             }
         }
@@ -63,15 +72,13 @@ final class AudioCaptureService {
         engine.prepare()
         try engine.start()
         audioEngine = engine
-        isCapturing = true
     }
 
     func stopCapture() {
         audioEngine?.inputNode.removeTap(onBus: 0)
         audioEngine?.stop()
         audioEngine = nil
-        isCapturing = false
-        audioLevel = 0
+        converter = nil
     }
 }
 
