@@ -19,6 +19,8 @@ struct MenuBarView: View {
         }
         .padding(DesignTokens.Spacing.m)
         .frame(width: 320)
+        .background(.regularMaterial)
+        .contentShape(Rectangle())
         .focusEffectDisabled()
     }
 
