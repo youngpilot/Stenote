@@ -19,7 +19,6 @@ struct MenuBarView: View {
         }
         .padding(DesignTokens.Spacing.m)
         .frame(width: 320)
-        .background(.regularMaterial)
         .contentShape(Rectangle())
         .focusEffectDisabled()
     }
@@ -108,7 +107,8 @@ struct MenuBarView: View {
                 .controlSize(.small)
             }
             .padding(DesignTokens.Spacing.s)
-            .background(.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.red.opacity(0.3), lineWidth: 0.5))
         }
 
         // Accessibility permission warning
@@ -132,7 +132,8 @@ struct MenuBarView: View {
                 .controlSize(.small)
             }
             .padding(DesignTokens.Spacing.s)
-            .background(.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.orange.opacity(0.3), lineWidth: 0.5))
         }
 
         // Current transcription preview — only while recording
@@ -160,7 +161,7 @@ struct MenuBarView: View {
             }
             .buttonStyle(.plain)
             .padding(DesignTokens.Spacing.s)
-            .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6))
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
         }
 
         // History
@@ -213,7 +214,7 @@ struct MenuBarView: View {
                     }
                     .buttonStyle(.plain)
                     .padding(DesignTokens.Spacing.s)
-                    .background(Color.primary.opacity(hoveredHistoryId == entry.id ? 0.08 : 0.03), in: RoundedRectangle(cornerRadius: 6))
+                    .background(hoveredHistoryId == entry.id ? AnyShapeStyle(.thinMaterial) : AnyShapeStyle(.ultraThinMaterial), in: RoundedRectangle(cornerRadius: 8))
                     .onHover { hovering in hoveredHistoryId = hovering ? entry.id : nil }
                 }
             }
@@ -487,7 +488,8 @@ private struct InlineSettingsView: View {
                     .buttonStyle(.link)
                 }
                 .padding(8)
-                .background(.blue.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.blue.opacity(0.3), lineWidth: 0.5))
             }
 
             Divider()

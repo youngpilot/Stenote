@@ -6,18 +6,38 @@ private let logger = Logger(subsystem: "com.youngpilot.Talkman", category: "AppD
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var rightClickMonitor: Any?
+    private var windowObserver: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         logger.info("Talkman launching...")
         requestMicrophonePermission()
         requestAccessibilityPermission()
         installRightClickMonitor()
+        configureMenuBarPanel()
 
         // Start model loading immediately on launch
         Task { @MainActor in
             logger.info("Starting model loading...")
             await RecordingManager.shared.setup()
             logger.info("Model loading complete")
+        }
+    }
+
+    /// Configure the MenuBarExtra NSPanel to block mouse events from passing through
+    private func configureMenuBarPanel() {
+        // The panel may not exist yet at launch, so observe window creation
+        windowObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didBecomeKeyNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let panel = notification.object as? NSPanel,
+                  panel.className.contains("StatusBarWindow") || panel.level == .popUpMenu || panel.level == .floating
+            else { return }
+            panel.ignoresMouseEvents = false
+            panel.acceptsMouseMovedEvents = true
+            panel.isMovableByWindowBackground = false
+            self?.windowObserver = nil
         }
     }
 
