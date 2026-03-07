@@ -29,6 +29,7 @@ Most people type at 40-80 WPM. You speak at 150+ WPM. Talkman closes that gap �
 
 - **Writing emails and messages** — draft replies in seconds instead of minutes
 - **Meeting notes and documentation** — speak your thoughts while they're fresh, get clean text instantly
+- **AI prompting** — dictate complex prompts to ChatGPT, Claude, Cursor, or any LLM tool faster than you can type them. Describe what you want in natural speech — no more wrestling with keyboard input for multi-paragraph instructions
 - **Coding comments and commit messages** — describe what your code does without breaking flow
 - **Chat and Slack** — respond at the speed of conversation
 - **Journaling and brainstorming** — capture ideas faster than you can think them through
