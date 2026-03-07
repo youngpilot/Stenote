@@ -20,7 +20,9 @@ struct TalkmanApp: App {
 
     static let micIdleIcon: NSImage = {
         let svg = solarMicBoldSVG.replacingOccurrences(of: "{color}", with: "black")
-        let image = NSImage(data: svg.data(using: .utf8)!)!
+        guard let data = svg.data(using: .utf8), let image = NSImage(data: data) else {
+            return NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "Microphone")!
+        }
         image.size = NSSize(width: 18, height: 18)
         image.isTemplate = true
         return image
@@ -28,7 +30,9 @@ struct TalkmanApp: App {
 
     static let micRecordingIcon: NSImage = {
         let svg = solarMicBoldSVG.replacingOccurrences(of: "{color}", with: "#E04848")
-        let image = NSImage(data: svg.data(using: .utf8)!)!
+        guard let data = svg.data(using: .utf8), let image = NSImage(data: data) else {
+            return NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "Microphone")!
+        }
         image.size = NSSize(width: 18, height: 18)
         image.isTemplate = false
         return image

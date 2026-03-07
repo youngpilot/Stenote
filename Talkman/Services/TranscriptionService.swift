@@ -81,7 +81,7 @@ final class TranscriptionService {
     // MARK: - Vocabulary Boosting
 
     func configureVocabularyBoosting() async {
-        guard let asrBox, ctcBox != nil else { return }
+        guard let asrBox, let ctcBox else { return }
 
         let brandNames = textReplacement.replacements
         guard !brandNames.isEmpty else {
@@ -104,10 +104,10 @@ final class TranscriptionService {
         do {
             try await asrBox.value.configureVocabularyBoosting(
                 vocabulary: vocabContext,
-                ctcModels: ctcBox!.value
+                ctcModels: ctcBox.value
             )
         } catch {
-            print("Vocabulary boosting setup failed: \(error)")
+            logger.warning("Vocabulary boosting setup failed: \(error)")
         }
     }
 
@@ -256,7 +256,7 @@ final class TranscriptionService {
             pendingParagraphBreak = false
             onSegmentReady?(prefix + corrected)
         } catch {
-            print("Transcription error: \(error)")
+            logger.error("Transcription error: \(error)")
         }
         isTranscribing_ASR = false
     }
