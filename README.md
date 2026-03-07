@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/feature.png" alt="Talkman" width="640">
+</p>
+
 # Talkman
 
 **The voice-to-text app macOS should have built in.**
@@ -57,6 +61,12 @@ Requires **macOS 15.2+** and **Apple Silicon** (M1 or later).
 You can also **right-click the menubar icon** to toggle recording, or **left-click** to open the settings panel.
 
 The mic icon turns red while recording.
+
+<p align="center">
+  <img src="assets/screenshot-main.png" alt="Main menu" width="340">
+  &nbsp;&nbsp;&nbsp;
+  <img src="assets/screenshot-settings.png" alt="Settings" width="340">
+</p>
 
 ## Features
 
