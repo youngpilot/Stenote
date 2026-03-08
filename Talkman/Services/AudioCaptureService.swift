@@ -60,10 +60,10 @@ final class AudioCaptureService: @unchecked Sendable {
                     if count > 0 {
                         var rms: Float = 0
                         vDSP_rmsqv(floatData[0], 1, &rms, vDSP_Length(count))
-                        // Convert to dB-like scale tuned for speech (RMS ~0.005-0.05)
+                        // Convert to dB-like scale tuned for laptop mic speech
                         // Maps silence → 0, quiet speech → 0.4, normal speech → 0.7, loud → 1.0
                         let db = 20 * log10(max(rms, 1e-6))
-                        let level = min(max((db + 46) / 40, 0), 1.0) // -46dB floor, -6dB ceiling
+                        let level = min(max((db + 55) / 40, 0), 1.0) // -55dB floor, -15dB ceiling
                         onLevel(level)
                     }
                 }

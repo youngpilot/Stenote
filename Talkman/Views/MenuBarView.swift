@@ -430,6 +430,12 @@ private struct InlineSettingsView: View {
         VStack(spacing: DesignTokens.Spacing.s) {
             // General
             SettingsCard(title: "General") {
+                Toggle("Launch at Login", isOn: Binding(
+                    get: { settings.launchAtLogin },
+                    set: { settings.launchAtLogin = $0 }
+                ))
+                .font(labelFont)
+
                 settingsRow("Shortcut") {
                     Picker("", selection: Binding(
                         get: { settings.hotkey },
@@ -443,7 +449,7 @@ private struct InlineSettingsView: View {
                         }
                     }
                     .labelsHidden()
-                    .frame(width: 180)
+                    .fixedSize()
                 }
 
                 if showFnKeyHint || settings.hotkey.needsFunctionKeyHint {
@@ -462,12 +468,6 @@ private struct InlineSettingsView: View {
                     .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6))
                     .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.blue.opacity(0.3), lineWidth: 0.5))
                 }
-
-                Toggle("Launch at Login", isOn: Binding(
-                    get: { settings.launchAtLogin },
-                    set: { settings.launchAtLogin = $0 }
-                ))
-                .font(labelFont)
             }
 
             // Recording
@@ -482,7 +482,7 @@ private struct InlineSettingsView: View {
                         }
                     }
                     .labelsHidden()
-                    .frame(width: 150)
+                    .fixedSize()
                 }
 
                 if settings.mediaPlaybackOption == .muteOnly, !audioService.supportsVolumeControl {
@@ -506,7 +506,7 @@ private struct InlineSettingsView: View {
                         }
                     }
                     .labelsHidden()
-                    .frame(width: 150)
+                    .fixedSize()
                 }
 
                 settingsRow("Auto-stop silence") {
@@ -519,7 +519,7 @@ private struct InlineSettingsView: View {
                         }
                     }
                     .labelsHidden()
-                    .frame(width: 80)
+                    .fixedSize()
                 }
             }
 
