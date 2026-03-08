@@ -3,6 +3,7 @@ import SwiftUI
 struct MenuBarView: View {
     @State private var recordingManager = RecordingManager.shared
     @State private var settings = SettingsStore.shared
+    @State private var audioService = SystemAudioService.shared
     @State private var copiedFeedback = false
     @State private var showSettings = false
     @State private var copiedHistoryId: UUID?
@@ -272,14 +273,39 @@ struct MenuBarView: View {
                 .help("Reset to Defaults")
             }
         }
-        .alert("Reset to Defaults?", isPresented: $showResetConfirm) {
-            Button("Cancel", role: .cancel) {}
-            Button("Reset", role: .destructive) {
-                SettingsStore.shared.resetToDefaults()
-                TextReplacementService.shared.removeAll()
+
+        if showResetConfirm {
+            VStack(spacing: DesignTokens.Spacing.s) {
+                Text("Reset to Defaults?")
+                    .font(.body)
+                    .fontWeight(.medium)
+                Text(resetSummary)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    Button("Cancel") {
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            showResetConfirm = false
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    Spacer()
+                    Button("Reset") {
+                        SettingsStore.shared.resetToDefaults()
+                        TextReplacementService.shared.removeAll()
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            showResetConfirm = false
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.red)
+                }
+                .font(.body)
             }
-        } message: {
-            Text(resetSummary)
+            .padding(DesignTokens.Spacing.s)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.red.opacity(0.3), lineWidth: 0.5))
         }
 
         Divider()
@@ -309,14 +335,6 @@ struct MenuBarView: View {
 
     // MARK: - Helpers
 
-    private var statusColor: Color {
-        if recordingManager.isRecording { return .red }
-        if recordingManager.isModelLoading { return .orange }
-        if recordingManager.modelLoadError != nil { return .red }
-        if recordingManager.isModelLoaded { return .green }
-        return .secondary
-    }
-
     private var statusText: String {
         if recordingManager.isRecording { return "Recording..." }
         if recordingManager.isModelLoading {
@@ -324,8 +342,28 @@ struct MenuBarView: View {
             return step.isEmpty ? "Loading model..." : step
         }
         if recordingManager.modelLoadError != nil { return "Model error" }
-        if recordingManager.isModelLoaded { return "Ready" }
+        if recordingManager.isModelLoaded {
+            if settings.mediaPlaybackOption == .muteOnly {
+                if !audioService.supportsVolumeControl {
+                    return "Ready — Mute may not work with this audio device"
+                }
+            }
+            return "Ready"
+        }
         return "Initializing..."
+    }
+
+    private var statusColor: Color {
+        if recordingManager.isRecording { return .red }
+        if recordingManager.isModelLoading { return .orange }
+        if recordingManager.modelLoadError != nil { return .red }
+        if recordingManager.isModelLoaded {
+            if settings.mediaPlaybackOption == .muteOnly {
+                if !audioService.supportsVolumeControl { return .orange }
+            }
+            return .green
+        }
+        return .secondary
     }
 }
 
@@ -381,6 +419,7 @@ private struct SettingsCard<Content: View>: View {
 private struct InlineSettingsView: View {
     @State private var settings = SettingsStore.shared
     @State private var replacementService = TextReplacementService.shared
+    @State private var audioService = SystemAudioService.shared
     @State private var newFrom = ""
     @State private var newTo = ""
     @State private var showFnKeyHint = false
@@ -433,7 +472,7 @@ private struct InlineSettingsView: View {
 
             // Recording
             SettingsCard(title: "Recording") {
-                settingsRow("Playback") {
+                settingsRow("Media Playback") {
                     Picker("", selection: Binding(
                         get: { settings.mediaPlaybackOption },
                         set: { settings.mediaPlaybackOption = $0 }
@@ -444,6 +483,17 @@ private struct InlineSettingsView: View {
                     }
                     .labelsHidden()
                     .frame(width: 150)
+                }
+
+                if settings.mediaPlaybackOption == .muteOnly, !audioService.supportsVolumeControl {
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        Text("Your audio device doesn't support software volume control. Use \"Pause & Resume\" instead.")
+                            .foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .font(labelFont)
                 }
 
                 settingsRow("Pause sensitivity") {

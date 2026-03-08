@@ -1,12 +1,16 @@
 import CoreAudio
+import Observation
 import os
 
 private let logger = Logger(subsystem: "com.youngpilot.Talkman", category: "SystemAudio")
 
 /// Fades system audio and pauses/resumes media playback during recording.
+@Observable
 @MainActor
 final class SystemAudioService {
     static let shared = SystemAudioService()
+
+    private(set) var supportsVolumeControl: Bool = true
 
     private var savedVolume: Float?
     private var fadeTimer: Timer?
@@ -17,22 +21,25 @@ final class SystemAudioService {
     // MediaRemote function pointers (loaded dynamically)
     private let mediaRemote = MediaRemoteBridge()
 
-    private init() {}
+    private init() {
+        // Defer setup to after @Observable init completes
+        DispatchQueue.main.async { [self] in
+            self.supportsVolumeControl = self.checkVolumeSupport()
+            self.installDeviceChangeListener()
+        }
+    }
 
     /// Fade audio down and optionally pause media playback
     func fadeOutAndPause(stopMedia: Bool) {
         fadeTimer?.invalidate()
         didPauseMedia = false
 
-        // Check if media is actually playing before pausing
+        // Pause media immediately (synchronous — reliable)
         if stopMedia {
-            mediaRemote.checkIsPlaying { [weak self] isPlaying in
-                guard let self, isPlaying else { return }
-                let wasPaused = self.mediaRemote.sendCommand(.pause)
-                if wasPaused {
-                    self.didPauseMedia = true
-                    logger.info("Paused media playback")
-                }
+            let wasPaused = mediaRemote.sendCommand(.pause)
+            if wasPaused {
+                didPauseMedia = true
+                logger.info("Paused media playback")
             }
         }
 
@@ -100,6 +107,39 @@ final class SystemAudioService {
         }
     }
 
+    // MARK: - Device change listener
+
+    private func installDeviceChangeListener() {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        AudioObjectAddPropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address,
+            DispatchQueue.main
+        ) { [weak self] _, _ in
+            Task { @MainActor in
+                self?.supportsVolumeControl = self?.checkVolumeSupport() ?? true
+            }
+        }
+    }
+
+    private func checkVolumeSupport() -> Bool {
+        let deviceID = getDefaultOutputDevice()
+        guard deviceID != kAudioObjectUnknown else { return false }
+        for element: UInt32 in [kAudioObjectPropertyElementMain, 1] {
+            var address = AudioObjectPropertyAddress(
+                mSelector: kAudioDevicePropertyVolumeScalar,
+                mScope: kAudioDevicePropertyScopeOutput,
+                mElement: element
+            )
+            if AudioObjectHasProperty(deviceID, &address) { return true }
+        }
+        return false
+    }
+
     // MARK: - CoreAudio helpers
 
     private func getDefaultOutputDevice() -> AudioDeviceID {
@@ -116,13 +156,26 @@ final class SystemAudioService {
         return status == noErr ? deviceID : kAudioObjectUnknown
     }
 
+    /// Find which element has volume control (master=0, or per-channel=1)
+    private func volumeElement(for deviceID: AudioDeviceID) -> UInt32 {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyVolumeScalar,
+            mScope: kAudioDevicePropertyScopeOutput,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        if AudioObjectHasProperty(deviceID, &address) { return kAudioObjectPropertyElementMain }
+        address.mElement = 1
+        if AudioObjectHasProperty(deviceID, &address) { return 1 }
+        return kAudioObjectPropertyElementMain
+    }
+
     private func getVolume(deviceID: AudioDeviceID) -> Float {
         var volume: Float32 = 0
         var size = UInt32(MemoryLayout<Float32>.size)
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyVolumeScalar,
             mScope: kAudioDevicePropertyScopeOutput,
-            mElement: kAudioObjectPropertyElementMain
+            mElement: volumeElement(for: deviceID)
         )
         AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &volume)
         return volume
@@ -130,15 +183,18 @@ final class SystemAudioService {
 
     private nonisolated func setVolume(deviceID: AudioDeviceID, volume: Float) {
         var vol = volume
-        var address = AudioObjectPropertyAddress(
-            mSelector: kAudioDevicePropertyVolumeScalar,
-            mScope: kAudioDevicePropertyScopeOutput,
-            mElement: kAudioObjectPropertyElementMain
-        )
-        AudioObjectSetPropertyData(
-            deviceID, &address, 0, nil,
-            UInt32(MemoryLayout<Float32>.size), &vol
-        )
+        // Set on all possible elements (master + channels 1 & 2)
+        for element: UInt32 in [kAudioObjectPropertyElementMain, 1, 2] {
+            var address = AudioObjectPropertyAddress(
+                mSelector: kAudioDevicePropertyVolumeScalar,
+                mScope: kAudioDevicePropertyScopeOutput,
+                mElement: element
+            )
+            AudioObjectSetPropertyData(
+                deviceID, &address, 0, nil,
+                UInt32(MemoryLayout<Float32>.size), &vol
+            )
+        }
     }
 }
 
@@ -151,9 +207,7 @@ private final class MediaRemoteBridge: @unchecked Sendable {
     }
 
     private typealias SendCommandFn = @convention(c) (UInt32, UnsafeRawPointer?) -> Bool
-    private typealias GetIsPlayingFn = @convention(c) (DispatchQueue, @escaping (Bool) -> Void) -> Void
     private let sendCommandFn: SendCommandFn?
-    private let getIsPlayingFn: GetIsPlayingFn?
 
     init() {
         guard let bundle = CFBundleCreate(
@@ -161,7 +215,6 @@ private final class MediaRemoteBridge: @unchecked Sendable {
             URL(fileURLWithPath: "/System/Library/PrivateFrameworks/MediaRemote.framework") as CFURL
         ) else {
             sendCommandFn = nil
-            getIsPlayingFn = nil
             return
         }
 
@@ -170,24 +223,10 @@ private final class MediaRemoteBridge: @unchecked Sendable {
         } else {
             sendCommandFn = nil
         }
-
-        if let ptr = CFBundleGetFunctionPointerForName(bundle, "MRMediaRemoteGetNowPlayingApplicationIsPlaying" as CFString) {
-            getIsPlayingFn = unsafeBitCast(ptr, to: GetIsPlayingFn.self)
-        } else {
-            getIsPlayingFn = nil
-        }
     }
 
     @discardableResult
     func sendCommand(_ command: Command) -> Bool {
         sendCommandFn?(command.rawValue, nil) ?? false
-    }
-
-    func checkIsPlaying(completion: @escaping (Bool) -> Void) {
-        guard let getIsPlayingFn else {
-            completion(false)
-            return
-        }
-        getIsPlayingFn(DispatchQueue.main, completion)
     }
 }
