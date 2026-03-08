@@ -107,8 +107,13 @@ final class RecordingManager {
             needsAccessibility = !AXIsProcessTrusted()
             SoundFeedback.playStart()
 
-            if SettingsStore.shared.muteAudioDuringRecording {
-                systemAudio.fadeOutAndPause()
+            switch SettingsStore.shared.mediaPlaybackOption {
+            case .stopMedia:
+                systemAudio.fadeOutAndPause(stopMedia: true)
+            case .muteOnly:
+                systemAudio.fadeOutAndPause(stopMedia: false)
+            case .none:
+                break
             }
 
             // Paste prefix text if configured
@@ -126,7 +131,9 @@ final class RecordingManager {
         audioCaptureService.stopCapture()
         isRecording = false
         audioLevel = 0.0
-        systemAudio.resumeAndFadeIn()
+        if SettingsStore.shared.mediaPlaybackOption != .none {
+            systemAudio.resumeAndFadeIn()
+        }
         SoundFeedback.playStop()
 
         // Transcribe remaining audio — the onSegmentReady callback wraps in

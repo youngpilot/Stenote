@@ -27,25 +27,16 @@ struct MenuBarView: View {
 
     @ViewBuilder
     private var mainSection: some View {
-        // Top bar: Record + Settings + Quit
+        // Top bar: Shortcut hint + Settings + Quit
         HStack(spacing: 8) {
-            Button {
-                recordingManager.toggle()
-            } label: {
-                HStack(spacing: 5) {
-                    let icon = recordingManager.isRecording
-                        ? TalkmanApp.micRecordingIcon
-                        : TalkmanApp.micIdleIcon
-                    Image(nsImage: icon)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 14, height: 14)
-                    Text(recordingManager.isRecording ? "Stop" : "Record")
-                }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(settings.hotkey.label)
+                    .font(.body)
+                    .fontWeight(.medium)
+                Text("Right-click the menubar icon")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
             }
-            .keyboardShortcut("r", modifiers: .command)
-            .controlSize(.large)
-            .disabled(!recordingManager.isModelLoaded)
 
             Spacer()
 
@@ -92,10 +83,10 @@ struct MenuBarView: View {
                     .foregroundStyle(.red)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Model loading failed")
-                        .font(DesignTokens.Font.caption)
+                        .font(.body)
                         .fontWeight(.medium)
                     Text(error)
-                        .font(.caption2)
+                        .font(.body)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                 }
@@ -103,7 +94,7 @@ struct MenuBarView: View {
                 Button("Retry") {
                     Task { await recordingManager.setup() }
                 }
-                .font(.caption2)
+                .font(.body)
                 .controlSize(.small)
             }
             .padding(DesignTokens.Spacing.s)
@@ -118,17 +109,17 @@ struct MenuBarView: View {
                     .foregroundStyle(.orange)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Accessibility permission required")
-                        .font(DesignTokens.Font.caption)
+                        .font(.body)
                         .fontWeight(.medium)
                     Text("Talkman needs this to type text into other apps.")
-                        .font(.caption2)
+                        .font(.body)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button("Grant") {
                     NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
                 }
-                .font(.caption2)
+                .font(.body)
                 .controlSize(.small)
             }
             .padding(DesignTokens.Spacing.s)
@@ -136,32 +127,37 @@ struct MenuBarView: View {
             .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.orange.opacity(0.3), lineWidth: 0.5))
         }
 
-        // Current transcription preview — only while recording
-        if recordingManager.isRecording, !recordingManager.currentText.isEmpty {
-            Button {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(recordingManager.currentText, forType: .string)
-                copiedFeedback = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    copiedFeedback = false
-                }
-            } label: {
-                HStack(alignment: .top, spacing: 4) {
-                    Text(copiedFeedback ? "Copied!" : recordingManager.currentText)
-                        .font(DesignTokens.Font.caption)
-                        .foregroundStyle(copiedFeedback ? .green : .secondary)
-                        .lineLimit(3)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    if !copiedFeedback {
-                        Image(systemName: "doc.on.doc")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
+        // Audio level + transcription preview while recording
+        if recordingManager.isRecording {
+            // Audio level indicator
+            AudioLevelView(level: recordingManager.audioLevel)
+
+            if !recordingManager.currentText.isEmpty {
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(recordingManager.currentText, forType: .string)
+                    copiedFeedback = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        copiedFeedback = false
+                    }
+                } label: {
+                    HStack(alignment: .top, spacing: 4) {
+                        Text(copiedFeedback ? "Copied!" : recordingManager.currentText)
+                            .font(.body)
+                            .foregroundStyle(copiedFeedback ? .green : .secondary)
+                            .lineLimit(3)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        if !copiedFeedback {
+                            Image(systemName: "doc.on.doc")
+                                .font(.body)
+                                .foregroundStyle(.tertiary)
+                        }
                     }
                 }
+                .buttonStyle(.plain)
+                .padding(DesignTokens.Spacing.s)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
             }
-            .buttonStyle(.plain)
-            .padding(DesignTokens.Spacing.s)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
         }
 
         // History
@@ -170,14 +166,14 @@ struct MenuBarView: View {
 
             HStack {
                 Text("Last 10 recordings")
-                    .font(DesignTokens.Font.caption)
+                    .font(.body)
                     .foregroundStyle(.secondary)
                     .fontWeight(.medium)
                 Spacer()
                 Button("Clear") {
                     recordingManager.historyService.clearHistory()
                 }
-                .font(.caption2)
+                .font(.body)
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
             }
@@ -198,7 +194,7 @@ struct MenuBarView: View {
                     } label: {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(copiedHistoryId == entry.id ? "Copied!" : entry.text)
-                                .font(DesignTokens.Font.caption)
+                                .font(.body)
                                 .foregroundStyle(copiedHistoryId == entry.id ? .green : .primary)
                                 .lineLimit(3)
                                 .truncationMode(.tail)
@@ -208,7 +204,7 @@ struct MenuBarView: View {
                                 Text("·")
                                 Text("\(entry.text.count) chars")
                             }
-                            .font(.caption2)
+                            .font(.body)
                             .foregroundStyle(.tertiary)
                         }
                     }
@@ -228,13 +224,13 @@ struct MenuBarView: View {
                 .fill(statusColor)
                 .frame(width: 8, height: 8)
             Text(statusText)
-                .font(DesignTokens.Font.caption)
+                .font(.body)
                 .foregroundStyle(.secondary)
             if recordingManager.isRecording, !recordingManager.detectedLanguage.isEmpty {
                 Text("·")
                     .foregroundStyle(.tertiary)
                 Text(recordingManager.detectedLanguage.uppercased())
-                    .font(.caption2)
+                    .font(.body)
                     .fontWeight(.medium)
                     .foregroundStyle(.secondary)
             }
@@ -246,38 +242,39 @@ struct MenuBarView: View {
 
     @ViewBuilder
     private var settingsSection: some View {
-        HStack {
-            Button {
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    showSettings = false
-                }
-            } label: {
-                Label("Back", systemImage: "chevron.left")
-            }
-            .font(DesignTokens.Font.caption)
-            .controlSize(.small)
-
-            Spacer()
-
+        ZStack {
             Text("Settings")
-                .font(DesignTokens.Font.body)
+                .font(.body)
                 .fontWeight(.medium)
 
-            Spacer()
+            HStack {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        showSettings = false
+                    }
+                } label: {
+                    Label("Back", systemImage: "chevron.left")
+                }
+                .font(.body)
 
-            Button {
-                showResetConfirm = true
-            } label: {
-                Image(systemName: "arrow.counterclockwise")
-                    .font(.system(size: 11))
+                Spacer()
+
+                Button {
+                    showResetConfirm = true
+                } label: {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 13))
+                        .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("Reset to Defaults")
             }
-            .font(DesignTokens.Font.caption)
-            .controlSize(.small)
-            .help("Restore Defaults")
         }
-        .alert("Restore Defaults?", isPresented: $showResetConfirm) {
+        .alert("Reset to Defaults?", isPresented: $showResetConfirm) {
             Button("Cancel", role: .cancel) {}
-            Button("Restore", role: .destructive) {
+            Button("Reset", role: .destructive) {
                 SettingsStore.shared.resetToDefaults()
                 TextReplacementService.shared.removeAll()
             }
@@ -296,16 +293,15 @@ struct MenuBarView: View {
         let r = TextReplacementService.shared
 
         if s.hotkey != .doubleRightCmd { items.append("Shortcut: \(s.hotkey.label) → Double-press Right ⌘") }
-        if !s.enableITN { items.append("Inverse Text Normalization: off → on") }
+        if !s.enableITN { items.append("Number formatting: off → on") }
         if s.vadSensitivity != .normal { items.append("Pause sensitivity: \(s.vadSensitivity.label) → Normal") }
         if s.autoStopTimeout != .thirty { items.append("Auto-stop: \(s.autoStopTimeout.label) → 30s") }
-        if s.muteAudioDuringRecording { items.append("Mute audio: on → off") }
-        if s.politenessMode { items.append("Politeness mode: on → off") }
+        if s.mediaPlaybackOption != .none { items.append("Playback: \(s.mediaPlaybackOption.label) → Don't interrupt") }
         if !s.prefixText.isEmpty { items.append("Prefix: \"\(s.prefixText)\" → empty") }
         if !s.suffixText.isEmpty { items.append("Suffix: \"\(s.suffixText)\" → empty") }
 
         let wordCount = r.replacements.count + r.boostWords.count
-        if wordCount > 0 { items.append("\(wordCount) brand name\(wordCount == 1 ? "" : "s") will be removed") }
+        if wordCount > 0 { items.append("\(wordCount) word correction\(wordCount == 1 ? "" : "s") will be removed") }
 
         if items.isEmpty { return "All settings are already at defaults." }
         return "This will reset:\n\n" + items.joined(separator: "\n")
@@ -333,6 +329,53 @@ struct MenuBarView: View {
     }
 }
 
+// MARK: - Audio Level Indicator
+
+private struct AudioLevelView: View {
+    let level: Float
+    private let barCount = 20
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(0..<barCount, id: \.self) { index in
+                let threshold = Float(index) / Float(barCount)
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(barColor(for: index))
+                    .frame(height: 6)
+                    .opacity(level > threshold ? 1.0 : 0.15)
+            }
+        }
+        .animation(.easeOut(duration: 0.08), value: level)
+    }
+
+    private func barColor(for index: Int) -> Color {
+        let ratio = Float(index) / Float(barCount)
+        if ratio > 0.8 { return .red }
+        if ratio > 0.6 { return .orange }
+        return .green
+    }
+}
+
+// MARK: - Settings Card
+
+private struct SettingsCard<Content: View>: View {
+    let title: String
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.s) {
+            Text(title)
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .fontWeight(.medium)
+            content()
+        }
+        .padding(DesignTokens.Spacing.s)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+    }
+}
+
 // MARK: - Inline Settings
 
 private struct InlineSettingsView: View {
@@ -342,240 +385,292 @@ private struct InlineSettingsView: View {
     @State private var newTo = ""
     @State private var showFnKeyHint = false
 
+    private let labelFont = Font.body
+
     var body: some View {
-        VStack(alignment: .leading, spacing: DesignTokens.Spacing.s) {
+        VStack(spacing: DesignTokens.Spacing.s) {
             // General
-            Text("General")
-                .font(DesignTokens.Font.caption)
-                .foregroundStyle(.secondary)
-                .fontWeight(.medium)
+            SettingsCard(title: "General") {
+                settingsRow("Shortcut") {
+                    Picker("", selection: Binding(
+                        get: { settings.hotkey },
+                        set: { newValue in
+                            settings.hotkey = newValue
+                            showFnKeyHint = newValue.needsFunctionKeyHint
+                        }
+                    )) {
+                        ForEach(HotkeyChoice.allCases) { choice in
+                            Text(choice.label).tag(choice)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 180)
+                }
 
-            Toggle("Inverse Text Normalization", isOn: Binding(
-                get: { settings.enableITN },
-                set: { settings.enableITN = $0 }
-            ))
-            .font(DesignTokens.Font.caption)
+                if showFnKeyHint || settings.hotkey.needsFunctionKeyHint {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Label("Enable standard function keys", systemImage: "info.circle.fill")
+                            .foregroundStyle(.blue)
+                        Text("To press \(settings.hotkey.label) without holding Fn:\nSystem Settings → Keyboard → \"Use F1, F2, etc. as standard function keys\"")
+                            .foregroundStyle(.secondary)
+                        Button("Open Keyboard Settings") {
+                            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!)
+                        }
+                        .buttonStyle(.link)
+                    }
+                    .font(labelFont)
+                    .padding(DesignTokens.Spacing.s)
+                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6))
+                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.blue.opacity(0.3), lineWidth: 0.5))
+                }
 
-            Toggle("Launch at Login", isOn: Binding(
-                get: { settings.launchAtLogin },
-                set: { settings.launchAtLogin = $0 }
-            ))
-            .font(DesignTokens.Font.caption)
-
-            Toggle("Mute Audio While Recording", isOn: Binding(
-                get: { settings.muteAudioDuringRecording },
-                set: { settings.muteAudioDuringRecording = $0 }
-            ))
-            .font(DesignTokens.Font.caption)
-            .help("Mute system audio output during recording to prevent interference, restores when done")
-
-            Divider()
-
-            // Text Options
-            Text("Text Options")
-                .font(DesignTokens.Font.caption)
-                .foregroundStyle(.secondary)
-                .fontWeight(.medium)
-
-            Toggle("Politeness Mode", isOn: Binding(
-                get: { settings.politenessMode },
-                set: { settings.politenessMode = $0 }
-            ))
-            .font(DesignTokens.Font.caption)
-            .help("Append \"Thank you!\" at the end of each transcription")
-
-            HStack(spacing: DesignTokens.Spacing.xs) {
-                Text("Prefix:")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 36, alignment: .trailing)
-                TextField("", text: Binding(
-                    get: { settings.prefixText },
-                    set: { settings.prefixText = $0 }
+                Toggle("Launch at Login", isOn: Binding(
+                    get: { settings.launchAtLogin },
+                    set: { settings.launchAtLogin = $0 }
                 ))
-                .textFieldStyle(.roundedBorder)
-                .font(.caption2)
+                .font(labelFont)
             }
 
-            HStack(spacing: DesignTokens.Spacing.xs) {
-                Text("Suffix:")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 36, alignment: .trailing)
-                TextField("", text: Binding(
-                    get: { settings.suffixText },
-                    set: { settings.suffixText = $0 }
+            // Recording
+            SettingsCard(title: "Recording") {
+                settingsRow("Playback") {
+                    Picker("", selection: Binding(
+                        get: { settings.mediaPlaybackOption },
+                        set: { settings.mediaPlaybackOption = $0 }
+                    )) {
+                        ForEach(MediaPlaybackOption.allCases) { option in
+                            Text(option.label).tag(option)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 150)
+                }
+
+                settingsRow("Pause sensitivity") {
+                    Picker("", selection: Binding(
+                        get: { settings.vadSensitivity },
+                        set: { settings.vadSensitivity = $0 }
+                    )) {
+                        ForEach(VadSensitivity.allCases) { sensitivity in
+                            Text(sensitivity.label).tag(sensitivity)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 150)
+                }
+
+                settingsRow("Auto-stop silence") {
+                    Picker("", selection: Binding(
+                        get: { settings.autoStopTimeout },
+                        set: { settings.autoStopTimeout = $0 }
+                    )) {
+                        ForEach(AutoStopOption.allCases) { option in
+                            Text(option.label).tag(option)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 80)
+                }
+            }
+
+            // Text Output
+            SettingsCard(title: "Text Output") {
+                Toggle("Number Formatting (ITN)", isOn: Binding(
+                    get: { settings.enableITN },
+                    set: { settings.enableITN = $0 }
                 ))
-                .textFieldStyle(.roundedBorder)
-                .font(.caption2)
-            }
+                .font(labelFont)
 
-            Divider()
-
-            // Pause Sensitivity
-            HStack {
-                Text("Pause sensitivity:")
-                    .font(DesignTokens.Font.caption)
-                Spacer()
-                Picker("", selection: Binding(
-                    get: { settings.vadSensitivity },
-                    set: { settings.vadSensitivity = $0 }
-                )) {
-                    ForEach(VadSensitivity.allCases) { sensitivity in
-                        Text(sensitivity.label).tag(sensitivity)
-                    }
-                }
-                .labelsHidden()
-                .frame(width: 130)
-                .font(DesignTokens.Font.caption)
-            }
-
-            // Auto-Stop Timeout
-            HStack {
-                Text("Auto-stop after silence:")
-                    .font(DesignTokens.Font.caption)
-                Spacer()
-                Picker("", selection: Binding(
-                    get: { settings.autoStopTimeout },
-                    set: { settings.autoStopTimeout = $0 }
-                )) {
-                    ForEach(AutoStopOption.allCases) { option in
-                        Text(option.label).tag(option)
-                    }
-                }
-                .labelsHidden()
-                .frame(width: 70)
-                .font(DesignTokens.Font.caption)
-            }
-
-            Divider()
-
-            // Shortcut
-            HStack {
-                Text("Shortcut:")
-                    .font(DesignTokens.Font.caption)
-                    .foregroundStyle(.secondary)
-                    .fontWeight(.medium)
-                Spacer()
-                Picker("", selection: Binding(
-                    get: { settings.hotkey },
-                    set: { newValue in
-                        settings.hotkey = newValue
-                        showFnKeyHint = newValue.needsFunctionKeyHint
-                    }
-                )) {
-                    ForEach(HotkeyChoice.allCases) { choice in
-                        Text(choice.label).tag(choice)
-                    }
-                }
-                .labelsHidden()
-                .frame(width: 180)
-                .font(DesignTokens.Font.caption)
-            }
-
-            if showFnKeyHint || settings.hotkey.needsFunctionKeyHint {
-                VStack(alignment: .leading, spacing: 4) {
-                    Label("Enable standard function keys", systemImage: "info.circle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.blue)
-                    Text("To press \(settings.hotkey.label) without holding Fn:\nSystem Settings → Keyboard → \"Use F1, F2, etc. as standard function keys\"")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                    Button("Open Keyboard Settings") {
-                        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!)
-                    }
-                    .font(.caption2)
-                    .buttonStyle(.link)
-                }
-                .padding(8)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
-                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.blue.opacity(0.3), lineWidth: 0.5))
-            }
-
-            Divider()
-
-            // Brand Names
-            Text("Brand Names")
-                .font(DesignTokens.Font.caption)
-                .foregroundStyle(.secondary)
-                .fontWeight(.medium)
-
-            HStack(spacing: 4) {
-                TextField("Wrong (optional)", text: $newFrom)
-                    .textFieldStyle(.roundedBorder)
-                    .font(DesignTokens.Font.caption)
-                Image(systemName: "arrow.right")
+                Text("Converts spoken numbers to digits: \"twenty three\" → \"23\", \"january fifth\" → \"January 5th\"")
+                    .font(labelFont)
                     .foregroundStyle(.tertiary)
-                    .font(.caption2)
-                TextField("Correct", text: $newTo)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                settingsRow("Prefix") {
+                    TextField("", text: Binding(
+                        get: { settings.prefixText },
+                        set: { settings.prefixText = $0 }
+                    ))
                     .textFieldStyle(.roundedBorder)
-                    .font(DesignTokens.Font.caption)
-                Button {
-                    guard !newTo.isEmpty else { return }
-                    if newFrom.isEmpty {
-                        replacementService.addBoostWord(newTo)
-                    } else {
-                        replacementService.addReplacement(from: newFrom, to: newTo)
-                    }
-                    newFrom = ""
-                    newTo = ""
-                } label: {
-                    Image(systemName: "plus.circle.fill")
                 }
-                .disabled(newTo.isEmpty)
-                .buttonStyle(.plain)
+
+                settingsRow("Suffix") {
+                    TextField("", text: Binding(
+                        get: { settings.suffixText },
+                        set: { settings.suffixText = $0 }
+                    ))
+                    .textFieldStyle(.roundedBorder)
+                }
             }
 
-            let hasEntries = !replacementService.replacements.isEmpty || !replacementService.boostWords.isEmpty
-            if hasEntries {
-                ScrollView {
-                    VStack(spacing: 2) {
-                        // Boost-only words
-                        ForEach(replacementService.boostWords, id: \.self) { word in
-                            HStack(spacing: 4) {
-                                Text(word)
-                                    .fontWeight(.medium)
-                                Spacer()
-                                Button {
-                                    replacementService.removeBoostWord(word)
-                                } label: {
-                                    Image(systemName: "xmark.circle")
-                                        .foregroundStyle(.secondary)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                            .font(DesignTokens.Font.caption)
-                        }
+            // Word Corrections
+            SettingsCard(title: "Word Corrections") {
+                Text("Add words to improve recognition, or correct misheard words.")
+                    .font(labelFont)
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
 
-                        // Replacement pairs
-                        ForEach(
-                            replacementService.replacements.sorted(by: { $0.key < $1.key }),
-                            id: \.key
-                        ) { from, to in
-                            HStack(spacing: 4) {
-                                Text(from)
-                                    .foregroundStyle(.secondary)
-                                Image(systemName: "arrow.right")
-                                    .foregroundStyle(.tertiary)
-                                    .font(.caption2)
-                                Text(to)
-                                    .fontWeight(.medium)
-                                Spacer()
-                                Button {
-                                    replacementService.removeReplacement(from: from)
-                                } label: {
-                                    Image(systemName: "xmark.circle")
-                                        .foregroundStyle(.secondary)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                            .font(DesignTokens.Font.caption)
-                        }
+                HStack(spacing: 4) {
+                    TextField("Wrong (optional)", text: $newFrom)
+                        .textFieldStyle(.roundedBorder)
+                    Image(systemName: "arrow.right")
+                        .foregroundStyle(.tertiary)
+                    TextField("Correct", text: $newTo)
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit { addWord() }
+                    Button { addWord() } label: {
+                        Image(systemName: "plus.circle.fill")
                     }
+                    .disabled(newTo.isEmpty)
+                    .buttonStyle(.plain)
                 }
-                .frame(maxHeight: 120)
+                .font(labelFont)
             }
 
+            // Word list — outside SettingsCard so @Observable triggers correctly
+            wordListSection
         }
+    }
+
+    // MARK: - Reusable row
+
+    private func settingsRow<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
+        HStack {
+            Text(label)
+                .font(labelFont)
+            Spacer()
+            content()
+                .font(labelFont)
+        }
+    }
+
+    // MARK: - Word list
+
+    @ViewBuilder
+    private var wordListSection: some View {
+        if !replacementService.boostWords.isEmpty || !replacementService.replacements.isEmpty {
+            WordPillsView(
+                boostWords: replacementService.boostWords.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending },
+                replacements: replacementService.replacements.sorted(by: { $0.key < $1.key }),
+                onRemoveBoost: { replacementService.removeBoostWord($0) },
+                onRemoveReplacement: { replacementService.removeReplacement(from: $0) }
+            )
+        }
+    }
+
+    private func addWord() {
+        guard !newTo.isEmpty else { return }
+        if newFrom.isEmpty {
+            replacementService.addBoostWord(newTo)
+        } else {
+            replacementService.addReplacement(from: newFrom, to: newTo)
+        }
+        newFrom = ""
+        newTo = ""
+    }
+}
+
+// MARK: - Word Pills
+
+private struct WordPillsView: View {
+    let boostWords: [String]
+    let replacements: [(key: String, value: String)]
+    let onRemoveBoost: (String) -> Void
+    let onRemoveReplacement: (String) -> Void
+
+    var body: some View {
+        let allPills: [(id: String, label: String)] = {
+            let b = boostWords.map { (id: "b:\($0)", label: $0) }
+            let r = replacements.map { (id: "r:\($0.key)", label: "\($0.key) → \($0.value)") }
+            return (b + r).sorted { $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending }
+        }()
+
+        WrappingHStack(spacing: 5) {
+            ForEach(allPills, id: \.id) { pill in
+                WordPill(label: pill.label) {
+                    if pill.id.hasPrefix("b:") {
+                        onRemoveBoost(String(pill.id.dropFirst(2)))
+                    } else {
+                        onRemoveReplacement(String(pill.id.dropFirst(2)))
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, DesignTokens.Spacing.s)
+    }
+}
+
+private struct WordPill: View {
+    let label: String
+    let onRemove: () -> Void
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(label)
+                .lineLimit(1)
+            Button { onRemove() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 18, height: 18)
+                    .background(.quaternary, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .contentShape(Circle().inset(by: -4))
+        }
+        .font(.body)
+        .padding(.leading, 10)
+        .padding(.trailing, 5)
+        .padding(.vertical, 4)
+        .background(.quaternary.opacity(0.5), in: Capsule())
+    }
+}
+
+// MARK: - Wrapping HStack Layout
+
+private struct WrappingHStack: Layout {
+    var spacing: CGFloat = 5
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout CGFloat) -> CGSize {
+        cache = proposal.width ?? 300
+        let rows = computeRows(maxWidth: cache, subviews: subviews)
+        var height: CGFloat = 0
+        for (i, row) in rows.enumerated() {
+            height += row.map { $0.sizeThatFits(.unspecified).height }.max() ?? 0
+            if i > 0 { height += spacing }
+        }
+        return CGSize(width: cache, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout CGFloat) {
+        let rows = computeRows(maxWidth: bounds.width, subviews: subviews)
+        var y = bounds.minY
+        for row in rows {
+            let rowHeight = row.map { $0.sizeThatFits(.unspecified).height }.max() ?? 0
+            var x = bounds.minX
+            for subview in row {
+                let size = subview.sizeThatFits(.unspecified)
+                subview.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
+                x += size.width + spacing
+            }
+            y += rowHeight + spacing
+        }
+    }
+
+    func makeCache(subviews: Subviews) -> CGFloat { 300 }
+
+    private func computeRows(maxWidth: CGFloat, subviews: Subviews) -> [[LayoutSubviews.Element]] {
+        var rows: [[LayoutSubviews.Element]] = [[]]
+        var currentWidth: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if currentWidth + size.width > maxWidth, !rows[rows.count - 1].isEmpty {
+                rows.append([])
+                currentWidth = 0
+            }
+            rows[rows.count - 1].append(subview)
+            currentWidth += size.width + spacing
+        }
+        return rows
     }
 }

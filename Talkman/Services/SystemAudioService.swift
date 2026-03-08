@@ -19,16 +19,21 @@ final class SystemAudioService {
 
     private init() {}
 
-    /// Fade audio down, then pause media playback
-    func fadeOutAndPause() {
+    /// Fade audio down and optionally pause media playback
+    func fadeOutAndPause(stopMedia: Bool) {
         fadeTimer?.invalidate()
         didPauseMedia = false
 
-        // Pause media immediately (if nothing is playing, this is a no-op)
-        let wasPaused = mediaRemote.sendCommand(.pause)
-        if wasPaused {
-            didPauseMedia = true
-            logger.info("Paused media playback")
+        // Check if media is actually playing before pausing
+        if stopMedia {
+            mediaRemote.checkIsPlaying { [weak self] isPlaying in
+                guard let self, isPlaying else { return }
+                let wasPaused = self.mediaRemote.sendCommand(.pause)
+                if wasPaused {
+                    self.didPauseMedia = true
+                    logger.info("Paused media playback")
+                }
+            }
         }
 
         let deviceID = getDefaultOutputDevice()
@@ -146,7 +151,9 @@ private final class MediaRemoteBridge: @unchecked Sendable {
     }
 
     private typealias SendCommandFn = @convention(c) (UInt32, UnsafeRawPointer?) -> Bool
+    private typealias GetIsPlayingFn = @convention(c) (DispatchQueue, @escaping (Bool) -> Void) -> Void
     private let sendCommandFn: SendCommandFn?
+    private let getIsPlayingFn: GetIsPlayingFn?
 
     init() {
         guard let bundle = CFBundleCreate(
@@ -154,6 +161,7 @@ private final class MediaRemoteBridge: @unchecked Sendable {
             URL(fileURLWithPath: "/System/Library/PrivateFrameworks/MediaRemote.framework") as CFURL
         ) else {
             sendCommandFn = nil
+            getIsPlayingFn = nil
             return
         }
 
@@ -162,10 +170,24 @@ private final class MediaRemoteBridge: @unchecked Sendable {
         } else {
             sendCommandFn = nil
         }
+
+        if let ptr = CFBundleGetFunctionPointerForName(bundle, "MRMediaRemoteGetNowPlayingApplicationIsPlaying" as CFString) {
+            getIsPlayingFn = unsafeBitCast(ptr, to: GetIsPlayingFn.self)
+        } else {
+            getIsPlayingFn = nil
+        }
     }
 
     @discardableResult
     func sendCommand(_ command: Command) -> Bool {
         sendCommandFn?(command.rawValue, nil) ?? false
+    }
+
+    func checkIsPlaying(completion: @escaping (Bool) -> Void) {
+        guard let getIsPlayingFn else {
+            completion(false)
+            return
+        }
+        getIsPlayingFn(DispatchQueue.main, completion)
     }
 }

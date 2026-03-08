@@ -46,6 +46,22 @@ enum AutoStopOption: Int, CaseIterable, Identifiable {
     }
 }
 
+enum MediaPlaybackOption: String, CaseIterable, Identifiable {
+    case none = "none"
+    case stopMedia = "stopMedia"
+    case muteOnly = "muteOnly"
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .none: "Don't interrupt"
+        case .stopMedia: "Pause & Resume"
+        case .muteOnly: "Mute Only"
+        }
+    }
+}
+
 enum HotkeyChoice: String, CaseIterable, Identifiable {
     case doubleRightCmd = "doubleRightCmd"
     case f5 = "f5"
@@ -125,8 +141,8 @@ final class SettingsStore {
         didSet { UserDefaults.standard.set(autoStopTimeout.rawValue, forKey: "autoStopTimeout") }
     }
 
-    var muteAudioDuringRecording: Bool {
-        didSet { UserDefaults.standard.set(muteAudioDuringRecording, forKey: "muteAudioDuringRecording") }
+    var mediaPlaybackOption: MediaPlaybackOption {
+        didSet { UserDefaults.standard.set(mediaPlaybackOption.rawValue, forKey: "mediaPlaybackOption") }
     }
 
     var onHotkeyChanged: ((HotkeyChoice) -> Void)?
@@ -139,7 +155,7 @@ final class SettingsStore {
         suffixText = ""
         vadSensitivity = .normal
         autoStopTimeout = .thirty
-        muteAudioDuringRecording = false
+        mediaPlaybackOption = .none
     }
 
     private init() {
@@ -154,6 +170,6 @@ final class SettingsStore {
             if ud.object(forKey: "autoStopTimeout") == nil { return .thirty }
             return AutoStopOption(rawValue: ud.integer(forKey: "autoStopTimeout")) ?? .thirty
         }()
-        self.muteAudioDuringRecording = ud.bool(forKey: "muteAudioDuringRecording")
+        self.mediaPlaybackOption = MediaPlaybackOption(rawValue: ud.string(forKey: "mediaPlaybackOption") ?? "") ?? .none
     }
 }
