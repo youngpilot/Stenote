@@ -121,22 +121,29 @@ final class OutputService {
         pasteboard.setString("", forType: Self.concealedType)
 
         // Only activate if not already frontmost
-        let needsActivation = NSWorkspace.shared.frontmostApplication?.processIdentifier != app.processIdentifier
-        if needsActivation {
+        let isFrontmost = NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier
+        if !isFrontmost {
             app.activate()
+            // Need a short delay for app activation to complete
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) { [weak self] in
+                self?.simulatePaste()
+                self?.scheduleDrain(to: app)
+            }
+        } else {
+            // Already frontmost — paste immediately, no delay
+            simulatePaste()
+            scheduleDrain(to: app)
         }
+    }
 
-        let activationDelay: TimeInterval = needsActivation ? 0.08 : 0.02
-        DispatchQueue.main.asyncAfter(deadline: .now() + activationDelay) { [weak self] in
-            self?.simulatePaste()
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                guard let self else { return }
-                if !self.pendingText.isEmpty {
-                    self.doPaste(to: app)
-                } else {
-                    self.isPasting = false
-                }
+    private func scheduleDrain(to app: NSRunningApplication) {
+        // Check for more pending text after a minimal delay for the paste to complete
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) { [weak self] in
+            guard let self else { return }
+            if !self.pendingText.isEmpty {
+                self.doPaste(to: app)
+            } else {
+                self.isPasting = false
             }
         }
     }

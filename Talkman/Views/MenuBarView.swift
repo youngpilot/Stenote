@@ -555,10 +555,27 @@ private struct InlineSettingsView: View {
 
             // Word Corrections
             SettingsCard(title: "Word Corrections") {
-                Text("Add words to improve recognition, or correct misheard words.")
+                Text("Wrong → Right corrections always work. Boost-only words (no \"Wrong\") need Boosting enabled.")
                     .font(labelFont)
                     .foregroundStyle(.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
+
+                Toggle("Model Boosting", isOn: Binding(
+                    get: { settings.enableVocabBoosting },
+                    set: { settings.enableVocabBoosting = $0 }
+                ))
+                .font(labelFont)
+
+                if settings.enableVocabBoosting {
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        Text("May reduce accuracy. If transcription quality drops, turn this off.")
+                            .foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .font(labelFont)
+                }
 
                 HStack(spacing: 4) {
                     TextField("Wrong (optional)", text: $newFrom)

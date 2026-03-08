@@ -145,6 +145,10 @@ final class SettingsStore {
         didSet { UserDefaults.standard.set(mediaPlaybackOption.rawValue, forKey: "mediaPlaybackOption") }
     }
 
+    var enableVocabBoosting: Bool {
+        didSet { UserDefaults.standard.set(enableVocabBoosting, forKey: "enableVocabBoosting") }
+    }
+
     var onHotkeyChanged: ((HotkeyChoice) -> Void)?
 
     func resetToDefaults() {
@@ -156,6 +160,7 @@ final class SettingsStore {
         vadSensitivity = .normal
         autoStopTimeout = .thirty
         mediaPlaybackOption = .none
+        enableVocabBoosting = false
     }
 
     private init() {
@@ -171,5 +176,6 @@ final class SettingsStore {
             return AutoStopOption(rawValue: ud.integer(forKey: "autoStopTimeout")) ?? .thirty
         }()
         self.mediaPlaybackOption = MediaPlaybackOption(rawValue: ud.string(forKey: "mediaPlaybackOption") ?? "") ?? .none
+        self.enableVocabBoosting = ud.object(forKey: "enableVocabBoosting") == nil ? false : ud.bool(forKey: "enableVocabBoosting")
     }
 }
