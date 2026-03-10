@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-VERSION="0.5.0"
+VERSION="0.5.1"
 APP_NAME="Talkman"
 TEAM_ID="${TALKMAN_TEAM_ID:?Set TALKMAN_TEAM_ID env var (Apple Developer Team ID)}"
 BUNDLE_ID="com.youngpilot.Talkman"
