@@ -1,3 +1,4 @@
+import AVFoundation
 import FluidAudio
 import Foundation
 import NaturalLanguage
@@ -17,34 +18,35 @@ final class TranscriptionService {
 
     private let textReplacement = TextReplacementService.shared
 
-    // FluidAudio components
-    // AsrManager is not Sendable but we guarantee single-writer access via @MainActor.
-    // Using @unchecked Sendable wrapper to satisfy Swift 6 strict concurrency.
-    private var asrBox: UncheckedSendableBox<AsrManager>?
+    // Shared FluidAudio components
+    private var asrModels: UncheckedSendableBox<AsrModels>?
+    private var asrBox: UncheckedSendableBox<AsrManager>?  // For Live mode
+    private var streamingAsr: StreamingAsrManager?          // For Accurate mode
     private var vadManager: VadManager?
     private var ctcBox: UncheckedSendableBox<CtcModels>?
 
     private var asrManager: AsrManager? { asrBox?.value }
     private var ctcModels: CtcModels? { ctcBox?.value }
 
-    // Audio accumulation for VAD-triggered batch transcription
+    // Which mode is active for current session
+    private var activeMode: TranscriptionMode = .live
+
+    // --- Live mode state ---
     private var accumulatedSamples: [Float] = []
-    private var vadBuffer: [Float] = []  // Accumulates samples across callbacks for VAD chunks
-    private var vadStreamState: VadStreamState = .initial()
-
-    // Silence tracking for auto-stop
-    private var silentChunkCount = 0
-    private var lastSpeechTime: Date?
-
-    // Paragraph break tracking
-    private var lastSpeechEndTime: Date?
-    private var pendingParagraphBreak = false
-
-    // Periodic transcription — transcribe every N seconds even without VAD speechEnd
-    // Only as a fallback; VAD speechEnd is the primary trigger
     private let periodicInterval: TimeInterval = 3.0
     private var lastTranscriptionTime: Date?
-    private var isTranscribing_ASR = false  // Guard against overlapping ASR calls
+    private var isTranscribing_ASR = false
+
+    // --- Accurate mode state ---
+    private var lastConfirmedText = ""
+    private var updateTask: Task<Void, Never>?
+
+    // --- Shared VAD state ---
+    private var vadBuffer: [Float] = []
+    private var vadStreamState: VadStreamState = .initial()
+    private var lastSpeechTime: Date?
+    private var lastSpeechEndTime: Date?
+    private var pendingParagraphBreak = false
 
     // Language detection
     private(set) var detectedLanguage = ""
@@ -55,25 +57,22 @@ final class TranscriptionService {
     // MARK: - Model Loading
 
     func loadModel() async throws {
-        // 1. Download and load ASR models (v3 = multilingual 25 EU languages)
-        modelLoadingStep = "Downloading ASR model… (1/4)"
+        modelLoadingStep = "Downloading ASR model… (1/3)"
         let models = try await AsrModels.downloadAndLoad(version: .v3)
-        modelLoadingStep = "Initializing ASR engine… (2/4)"
+        asrModels = UncheckedSendableBox(models)
+
+        // Initialize batch ASR manager (used in Live mode)
+        modelLoadingStep = "Initializing ASR engine… (2/3)"
         let manager = AsrManager(config: .default)
         try await manager.initialize(models: models)
         asrBox = UncheckedSendableBox(manager)
 
-        // 2. Initialize VAD (downloads Silero model on first launch)
-        modelLoadingStep = "Loading VAD model… (3/4)"
+        // Initialize VAD
+        modelLoadingStep = "Loading VAD model… (3/3)"
         vadManager = try await VadManager()
 
-        // 3. Download CTC models for vocabulary boosting
-        modelLoadingStep = "Loading CTC model… (4/4)"
+        // Download CTC models for vocabulary boosting
         ctcBox = UncheckedSendableBox(try await CtcModels.downloadAndLoad())
-
-        // 4. Configure vocabulary boosting if brand names exist
-        modelLoadingStep = "Configuring vocabulary…"
-        await configureVocabularyBoosting()
 
         modelLoadingStep = ""
         isModelLoaded = true
@@ -89,29 +88,13 @@ final class TranscriptionService {
             return
         }
 
-        let brandNames = textReplacement.replacements
-        let boostWords = textReplacement.boostWords
-        guard !brandNames.isEmpty || !boostWords.isEmpty else {
+        let terms = buildVocabularyTerms()
+        guard !terms.isEmpty else {
             asrBox.value.disableVocabularyBoosting()
             return
         }
 
-        // Convert brand names to CustomVocabularyTerms
-        var terms = brandNames.map { from, to in
-            CustomVocabularyTerm(
-                text: to,
-                weight: 10.0,
-                aliases: [from]
-            )
-        }
-
-        // Add boost-only words (no alias, just boost the correct spelling)
-        terms += boostWords.map { word in
-            CustomVocabularyTerm(text: word, weight: 10.0)
-        }
-
         let vocabContext = CustomVocabularyContext(terms: terms)
-
         do {
             try await asrBox.value.configureVocabularyBoosting(
                 vocabulary: vocabContext,
@@ -122,36 +105,102 @@ final class TranscriptionService {
         }
     }
 
-    // MARK: - Transcription Flow
+    private func buildVocabularyTerms() -> [CustomVocabularyTerm] {
+        let brandNames = textReplacement.replacements
+        let boostWords = textReplacement.boostWords
+        guard !brandNames.isEmpty || !boostWords.isEmpty else { return [] }
 
-    func startTranscription() {
+        var terms = brandNames.map { from, to in
+            CustomVocabularyTerm(text: to, weight: 10.0, aliases: [from])
+        }
+        terms += boostWords.map { word in
+            CustomVocabularyTerm(text: word, weight: 10.0)
+        }
+        return terms
+    }
+
+    // MARK: - Start / Stop
+
+    func startTranscription() async {
         guard isModelLoaded else { return }
-        isTranscribing = true
+
+        activeMode = SettingsStore.shared.transcriptionMode
+
+        // Reset shared state
         currentText = ""
         segments = []
-        accumulatedSamples = []
         vadBuffer = []
         vadStreamState = .initial()
-        silentChunkCount = 0
         lastSpeechTime = Date()
         lastSpeechEndTime = nil
         pendingParagraphBreak = false
-        lastTranscriptionTime = Date()
-        isTranscribing_ASR = false
         detectedLanguage = ""
+
+        if activeMode == .accurate {
+            await startAccurateMode()
+        } else {
+            startLiveMode()
+        }
+
+        isTranscribing = true
     }
 
-    func processAudioSamples(_ samples: [Float]) async {
-        guard isTranscribing, let vadManager else { return }
-        guard !samples.isEmpty else { return }
+    func stopTranscription() async -> String {
+        guard isTranscribing else { return currentText }
 
-        // Accumulate all audio for transcription
-        accumulatedSamples.append(contentsOf: samples)
+        if activeMode == .accurate {
+            await stopAccurateMode()
+        } else {
+            await stopLiveMode()
+        }
 
-        // Accumulate samples across callbacks for VAD (chunkSize=4096, callbacks ~1365)
+        isTranscribing = false
+        return currentText
+    }
+
+    // MARK: - Audio Input
+
+    func processAudioBuffer(_ buffer: AVAudioPCMBuffer) async {
+        guard isTranscribing else { return }
+
+        if activeMode == .accurate {
+            // Feed to streaming ASR
+            if let asr = streamingAsr {
+                nonisolated(unsafe) let sendableBuffer = buffer
+                await asr.streamAudio(sendableBuffer)
+            }
+        }
+
+        // Extract samples for VAD + Live mode
+        guard let channelData = buffer.floatChannelData else { return }
+        let count = Int(buffer.frameLength)
+        guard count > 0 else { return }
+        let samples = Array(UnsafeBufferPointer(start: channelData[0], count: count))
+
+        if activeMode == .live {
+            accumulatedSamples.append(contentsOf: samples)
+        }
+
+        await processVadSamples(samples)
+
+        // Live mode: periodic transcription fallback
+        if activeMode == .live {
+            if !isTranscribing_ASR,
+               accumulatedSamples.count >= 16_000,
+               let lastTime = lastTranscriptionTime,
+               Date().timeIntervalSince(lastTime) >= periodicInterval {
+                await transcribeAccumulatedLive(isMidSpeech: true)
+            }
+        }
+    }
+
+    // MARK: - VAD Processing (shared)
+
+    private func processVadSamples(_ samples: [Float]) async {
+        guard let vadManager else { return }
+
         vadBuffer.append(contentsOf: samples)
 
-        // Drain vadBuffer in chunkSize pieces
         let chunkSize = VadManager.chunkSize
         while vadBuffer.count >= chunkSize {
             let chunk = Array(vadBuffer[0..<chunkSize])
@@ -168,8 +217,6 @@ final class TranscriptionService {
                 )
                 vadStreamState = result.state
 
-                // Keep lastSpeechTime fresh while speech is active
-                // (prevents auto-stop during continuous speaking without VAD events)
                 if result.state.triggered {
                     lastSpeechTime = Date()
                 }
@@ -177,18 +224,20 @@ final class TranscriptionService {
                 if let event = result.event {
                     switch event.kind {
                     case .speechStart:
-                        // Check for paragraph break (gap > 2.5s since last speech end)
                         if let lastEnd = lastSpeechEndTime,
                            Date().timeIntervalSince(lastEnd) > 2.5 {
                             pendingParagraphBreak = true
                         }
                     case .speechEnd:
                         lastSpeechEndTime = Date()
-                        await transcribeAccumulated()
+                        // Live mode: transcribe on speech end
+                        if activeMode == .live {
+                            await transcribeAccumulatedLive()
+                        }
                     }
                 }
 
-                // Auto-stop after prolonged silence (0 = disabled)
+                // Auto-stop after prolonged silence
                 let timeout = SettingsStore.shared.autoStopTimeout
                 if timeout != .off,
                    let lastSpeech = lastSpeechTime,
@@ -197,25 +246,43 @@ final class TranscriptionService {
                     return
                 }
             } catch {
-                // VAD error — continue accumulating
+                // VAD error — continue
             }
-        }
-
-        // Periodic transcription: if enough audio has accumulated without a VAD speechEnd,
-        // transcribe now so text appears while the user is still speaking
-        if !isTranscribing_ASR,
-           accumulatedSamples.count >= 16_000,  // at least 1s of audio
-           let lastTime = lastTranscriptionTime,
-           Date().timeIntervalSince(lastTime) >= periodicInterval {
-            await transcribeAccumulated(isMidSpeech: true)
         }
     }
 
-    private func transcribeAccumulated(isMidSpeech: Bool = false) async {
-        guard !accumulatedSamples.isEmpty, let asrBox, !isTranscribing_ASR else { return }
+    // MARK: - Live Mode
 
-        // Need at least 0.5 seconds of audio (8000 samples at 16kHz)
-        // Check BEFORE moving samples out — otherwise short chunks are lost forever
+    private func startLiveMode() {
+        accumulatedSamples = []
+        lastTranscriptionTime = Date()
+        isTranscribing_ASR = false
+
+        // Reconfigure vocab boosting on the batch ASR manager
+        Task { await configureVocabularyBoosting() }
+    }
+
+    private func stopLiveMode() async {
+        // Flush remaining VAD buffer into accumulated
+        if !vadBuffer.isEmpty {
+            accumulatedSamples.append(contentsOf: vadBuffer)
+            vadBuffer = []
+        }
+
+        isTranscribing_ASR = false
+
+        // Transcribe ALL remaining audio — never discard
+        if !accumulatedSamples.isEmpty {
+            let minSamples = 8_000
+            if accumulatedSamples.count < minSamples {
+                accumulatedSamples.append(contentsOf: [Float](repeating: 0, count: minSamples - accumulatedSamples.count))
+            }
+            await transcribeAccumulatedLive()
+        }
+    }
+
+    private func transcribeAccumulatedLive(isMidSpeech: Bool = false) async {
+        guard !accumulatedSamples.isEmpty, let asrBox, !isTranscribing_ASR else { return }
         guard accumulatedSamples.count >= 8_000 else { return }
 
         isTranscribing_ASR = true
@@ -230,11 +297,9 @@ final class TranscriptionService {
             let rawText = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !rawText.isEmpty else { return }
 
-            // Apply regex replacements as fallback (vocab boosting handles most cases)
             var corrected = textReplacement.applyReplacements(to: rawText)
 
-            // Strip trailing sentence punctuation from mid-speech chunks —
-            // the ASR model thinks each chunk is a complete sentence
+            // Strip trailing punctuation from mid-speech chunks
             if isMidSpeech {
                 while corrected.last == "." || corrected.last == "?" || corrected.last == "!" {
                     corrected.removeLast()
@@ -243,7 +308,7 @@ final class TranscriptionService {
                 guard !corrected.isEmpty else { return }
             }
 
-            // Detect language using NaturalLanguage
+            // Detect language
             let recognizer = NLLanguageRecognizer()
             recognizer.processString(corrected)
             if let lang = recognizer.dominantLanguage?.rawValue {
@@ -259,7 +324,6 @@ final class TranscriptionService {
             segments.append(segment)
             currentText = segments.map(\.text).joined(separator: " ")
 
-            // Insert paragraph break prefix if a long pause was detected
             let prefix = pendingParagraphBreak ? "\n\n" : ""
             pendingParagraphBreak = false
             onSegmentReady?(prefix + corrected)
@@ -268,29 +332,139 @@ final class TranscriptionService {
         }
     }
 
-    func stopTranscription() async -> String {
-        guard isTranscribing else { return currentText }
+    // MARK: - Accurate Mode
 
-        // Flush any remaining vadBuffer samples into accumulated
-        if !vadBuffer.isEmpty {
-            accumulatedSamples.append(contentsOf: vadBuffer)
-            vadBuffer = []
-        }
+    private func startAccurateMode() async {
+        guard let asrModels else { return }
 
-        // Reset ASR guard so final transcription can run
-        isTranscribing_ASR = false
+        lastConfirmedText = ""
 
-        // Transcribe ALL remaining audio — never discard
-        if !accumulatedSamples.isEmpty {
-            // Pad short audio to minimum 0.5s so ASR can process it
-            let minSamples = 8_000
-            if accumulatedSamples.count < minSamples {
-                accumulatedSamples.append(contentsOf: [Float](repeating: 0, count: minSamples - accumulatedSamples.count))
+        let config = StreamingAsrConfig.streaming
+        let asr = StreamingAsrManager(config: config)
+
+        // Configure vocabulary boosting on streaming manager
+        if SettingsStore.shared.enableVocabBoosting, let ctcModels {
+            let terms = buildVocabularyTerms()
+            if !terms.isEmpty {
+                let vocabContext = CustomVocabularyContext(terms: terms)
+                do {
+                    try await asr.configureVocabularyBoosting(
+                        vocabulary: vocabContext,
+                        ctcModels: ctcModels
+                    )
+                } catch {
+                    logger.warning("Vocabulary boosting setup failed: \(error)")
+                }
             }
-            await transcribeAccumulated()
         }
 
-        isTranscribing = false
-        return currentText
+        do {
+            try await asr.start(models: asrModels.value, source: .microphone)
+        } catch {
+            logger.error("Failed to start streaming ASR: \(error)")
+            return
+        }
+
+        streamingAsr = asr
+
+        updateTask = Task { [weak self] in
+            for await update in await asr.transcriptionUpdates {
+                await MainActor.run {
+                    self?.handleStreamingUpdate(update)
+                }
+            }
+        }
+    }
+
+    private func stopAccurateMode() async {
+        if let asr = streamingAsr {
+            do {
+                let finalText = try await asr.finish()
+                let trimmed = finalText.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty {
+                    let corrected = textReplacement.applyReplacements(to: trimmed)
+                    let newText: String
+                    if corrected.hasPrefix(lastConfirmedText) {
+                        newText = String(corrected.dropFirst(lastConfirmedText.count))
+                            .trimmingCharacters(in: .whitespaces)
+                    } else {
+                        newText = corrected
+                    }
+                    if !newText.isEmpty {
+                        // Detect language
+                        let recognizer = NLLanguageRecognizer()
+                        recognizer.processString(newText)
+                        if let lang = recognizer.dominantLanguage?.rawValue {
+                            detectedLanguage = String(lang.prefix(2))
+                        }
+
+                        let segment = TranscriptionSegment(
+                            text: newText,
+                            timestamp: Date(),
+                            language: detectedLanguage.isEmpty ? nil : detectedLanguage,
+                            isFinal: true
+                        )
+                        segments.append(segment)
+                        currentText = segments.map(\.text).joined(separator: " ")
+                        onSegmentReady?(newText)
+                    }
+                }
+            } catch {
+                logger.error("Streaming ASR finish error: \(error)")
+            }
+        }
+
+        updateTask?.cancel()
+        updateTask = nil
+        streamingAsr = nil
+    }
+
+    private func handleStreamingUpdate(_ update: StreamingTranscriptionUpdate) {
+        let rawText = update.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !rawText.isEmpty else { return }
+
+        let corrected = textReplacement.applyReplacements(to: rawText)
+
+        if update.isConfirmed {
+            let newText: String
+            if corrected.hasPrefix(lastConfirmedText) {
+                newText = String(corrected.dropFirst(lastConfirmedText.count))
+                    .trimmingCharacters(in: .whitespaces)
+            } else {
+                newText = corrected
+            }
+            lastConfirmedText = corrected
+
+            guard !newText.isEmpty else { return }
+
+            let recognizer = NLLanguageRecognizer()
+            recognizer.processString(newText)
+            if let lang = recognizer.dominantLanguage?.rawValue {
+                detectedLanguage = String(lang.prefix(2))
+            }
+
+            let segment = TranscriptionSegment(
+                text: newText,
+                timestamp: Date(),
+                language: detectedLanguage.isEmpty ? nil : detectedLanguage,
+                isFinal: true
+            )
+            segments.append(segment)
+            currentText = segments.map(\.text).joined(separator: " ")
+
+            let prefix = pendingParagraphBreak ? "\n\n" : ""
+            pendingParagraphBreak = false
+            onSegmentReady?(prefix + newText)
+        } else {
+            // Volatile — show as preview
+            if corrected.hasPrefix(lastConfirmedText) {
+                let preview = String(corrected.dropFirst(lastConfirmedText.count))
+                    .trimmingCharacters(in: .whitespaces)
+                if !preview.isEmpty {
+                    let confirmedPart = segments.map(\.text).joined(separator: " ")
+                    currentText = confirmedPart.isEmpty ? preview : confirmedPart + " " + preview
+                }
+            }
+        }
     }
 }

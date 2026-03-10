@@ -472,6 +472,27 @@ private struct InlineSettingsView: View {
 
             // Recording
             SettingsCard(title: "Recording") {
+                settingsRow("Mode") {
+                    Picker("", selection: Binding(
+                        get: { settings.transcriptionMode },
+                        set: { settings.transcriptionMode = $0 }
+                    )) {
+                        ForEach(TranscriptionMode.allCases) { mode in
+                            Text(mode.label).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .fixedSize()
+                }
+
+                Text(settings.transcriptionMode == .live
+                     ? "Text appears as you speak, phrase by phrase."
+                     : "Text appears when you stop. Max accuracy.")
+                    .font(labelFont)
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+
                 settingsRow("Media Playback") {
                     Picker("", selection: Binding(
                         get: { settings.mediaPlaybackOption },
@@ -483,6 +504,28 @@ private struct InlineSettingsView: View {
                     }
                     .labelsHidden()
                     .fixedSize()
+                }
+
+                if settings.mediaPlaybackOption == .stopMedia {
+                    if let app = audioService.detectedMediaApp {
+                        HStack(alignment: .top, spacing: 6) {
+                            Image(systemName: "info.circle.fill")
+                                .foregroundStyle(.blue)
+                            Text("\(app) detected — will pause and resume during recording.")
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .font(labelFont)
+                    } else {
+                        HStack(alignment: .top, spacing: 6) {
+                            Image(systemName: "info.circle.fill")
+                                .foregroundStyle(.secondary)
+                            Text("Works with Spotify and Apple Music. No supported app running.")
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .font(labelFont)
+                    }
                 }
 
                 if settings.mediaPlaybackOption == .muteOnly, !audioService.supportsVolumeControl {

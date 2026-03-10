@@ -61,13 +61,20 @@ final class HotkeyService {
         case .f5:
             guard event.keyCode == 96 else { return }
             fireToggle()
-        case .f6:
-            guard event.keyCode == 97 else { return }
-            fireToggle()
-        case .controlShiftSpace:
+        case .optionSpace:
+            // Space (49) + Option modifier only
             guard event.keyCode == 49,
-                  event.modifierFlags.contains(.control),
-                  event.modifierFlags.contains(.shift) else { return }
+                  event.modifierFlags.contains(.option),
+                  !event.modifierFlags.contains(.command),
+                  !event.modifierFlags.contains(.control) else { return }
+            fireToggle()
+        case .fnSpace:
+            // Space (49) + Fn modifier only
+            guard event.keyCode == 49,
+                  event.modifierFlags.contains(.function),
+                  !event.modifierFlags.contains(.command),
+                  !event.modifierFlags.contains(.option),
+                  !event.modifierFlags.contains(.control) else { return }
             fireToggle()
         default:
             break

@@ -62,27 +62,41 @@ enum MediaPlaybackOption: String, CaseIterable, Identifiable {
     }
 }
 
+enum TranscriptionMode: String, CaseIterable, Identifiable {
+    case live = "live"
+    case accurate = "accurate"
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .live: "Live"
+        case .accurate: "Accurate"
+        }
+    }
+}
+
 enum HotkeyChoice: String, CaseIterable, Identifiable {
     case doubleRightCmd = "doubleRightCmd"
+    case optionSpace = "optionSpace"
+    case fnSpace = "fnSpace"
     case f5 = "f5"
-    case f6 = "f6"
     case doubleFn = "doubleFn"
-    case controlShiftSpace = "controlShiftSpace"
 
     var id: String { rawValue }
 
     var label: String {
         switch self {
         case .doubleRightCmd: "Double-press Right ⌘"
+        case .optionSpace: "⌥Space"
+        case .fnSpace: "Fn+Space"
         case .f5: "F5"
-        case .f6: "F6"
         case .doubleFn: "Double-press Fn/🌐"
-        case .controlShiftSpace: "⌃⇧Space"
         }
     }
 
     var needsFunctionKeyHint: Bool {
-        self == .f5 || self == .f6
+        self == .f5
     }
 }
 
@@ -149,6 +163,10 @@ final class SettingsStore {
         didSet { UserDefaults.standard.set(enableVocabBoosting, forKey: "enableVocabBoosting") }
     }
 
+    var transcriptionMode: TranscriptionMode {
+        didSet { UserDefaults.standard.set(transcriptionMode.rawValue, forKey: "transcriptionMode") }
+    }
+
     var onHotkeyChanged: ((HotkeyChoice) -> Void)?
 
     func resetToDefaults() {
@@ -161,6 +179,7 @@ final class SettingsStore {
         autoStopTimeout = .thirty
         mediaPlaybackOption = .none
         enableVocabBoosting = false
+        transcriptionMode = .accurate
     }
 
     private init() {
@@ -177,5 +196,6 @@ final class SettingsStore {
         }()
         self.mediaPlaybackOption = MediaPlaybackOption(rawValue: ud.string(forKey: "mediaPlaybackOption") ?? "") ?? .none
         self.enableVocabBoosting = ud.object(forKey: "enableVocabBoosting") == nil ? false : ud.bool(forKey: "enableVocabBoosting")
+        self.transcriptionMode = TranscriptionMode(rawValue: ud.string(forKey: "transcriptionMode") ?? "") ?? .accurate
     }
 }

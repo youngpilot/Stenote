@@ -1,3 +1,4 @@
+import AppKit
 import CoreAudio
 import Observation
 import os
@@ -11,35 +12,66 @@ final class SystemAudioService {
     static let shared = SystemAudioService()
 
     private(set) var supportsVolumeControl: Bool = true
+    private(set) var detectedMediaApp: String?
 
     private var savedVolume: Float?
     private var fadeTimer: Timer?
-    private var didPauseMedia = false
+    private var pausedApp: String?
     private let fadeDuration: TimeInterval = 0.3
     private let fadeSteps = 10
 
-    // MediaRemote function pointers (loaded dynamically)
-    private let mediaRemote = MediaRemoteBridge()
+    private static let supportedMediaApps: [(name: String, scriptName: String, bundleId: String)] = [
+        ("Spotify", "Spotify", "com.spotify.client"),
+        ("Apple Music", "Music", "com.apple.Music"),
+    ]
 
     private init() {
-        // Defer setup to after @Observable init completes
         DispatchQueue.main.async { [self] in
             self.supportsVolumeControl = self.checkVolumeSupport()
             self.installDeviceChangeListener()
+            self.refreshDetectedMediaApp()
+            self.installWorkspaceObservers()
         }
     }
+
+    // MARK: - Media app detection
+
+    private func refreshDetectedMediaApp() {
+        detectedMediaApp = Self.supportedMediaApps.first { entry in
+            NSWorkspace.shared.runningApplications.contains { $0.bundleIdentifier == entry.bundleId }
+        }?.name
+    }
+
+    private func installWorkspaceObservers() {
+        let nc = NSWorkspace.shared.notificationCenter
+        let handler: @Sendable (Notification) -> Void = { [weak self] _ in
+            Task { @MainActor in
+                self?.refreshDetectedMediaApp()
+            }
+        }
+        nc.addObserver(forName: NSWorkspace.didLaunchApplicationNotification, object: nil, queue: .main, using: handler)
+        nc.addObserver(forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main, using: handler)
+    }
+
+    // MARK: - Media control via AppleScript
 
     /// Fade audio down and optionally pause media playback
     func fadeOutAndPause(stopMedia: Bool) {
         fadeTimer?.invalidate()
-        didPauseMedia = false
+        pausedApp = nil
 
-        // Pause media immediately (synchronous — reliable)
         if stopMedia {
-            let wasPaused = mediaRemote.sendCommand(.pause)
-            if wasPaused {
-                didPauseMedia = true
-                logger.info("Paused media playback")
+            for (name, scriptName, bundleId) in Self.supportedMediaApps {
+                guard NSWorkspace.shared.runningApplications.contains(where: { $0.bundleIdentifier == bundleId }) else { continue }
+                guard let stateScript = NSAppleScript(source: "tell application \"\(scriptName)\" to player state as string") else { continue }
+                var error: NSDictionary?
+                let descriptor = stateScript.executeAndReturnError(&error)
+                if let result = descriptor.stringValue, result == "playing" {
+                    NSAppleScript(source: "tell application \"\(scriptName)\" to pause")?.executeAndReturnError(nil)
+                    pausedApp = scriptName
+                    logger.info("Paused \(name) via AppleScript")
+                    break
+                }
             }
         }
 
@@ -67,20 +99,19 @@ final class SystemAudioService {
         let deviceID = getDefaultOutputDevice()
         let targetVolume = savedVolume ?? 0
 
-        // Restore volume first (so resume isn't silent)
         if targetVolume > 0.001, deviceID != kAudioObjectUnknown {
             animateVolume(deviceID: deviceID, from: 0, to: targetVolume)
             logger.info("Fading in system audio to \(targetVolume)")
         }
         savedVolume = nil
 
-        // Resume media after a short delay so volume has started fading in
-        if didPauseMedia {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-                self?.mediaRemote.sendCommand(.play)
-                logger.info("Resumed media playback")
+        if let app = pausedApp {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                let playScript = NSAppleScript(source: "tell application \"\(app)\" to play")
+                playScript?.executeAndReturnError(nil)
+                logger.info("Resumed \(app) via AppleScript")
             }
-            didPauseMedia = false
+            pausedApp = nil
         }
     }
 
@@ -198,35 +229,3 @@ final class SystemAudioService {
     }
 }
 
-// MARK: - MediaRemote bridge (private framework, loaded dynamically)
-
-private final class MediaRemoteBridge: @unchecked Sendable {
-    enum Command: UInt32 {
-        case play = 0
-        case pause = 1
-    }
-
-    private typealias SendCommandFn = @convention(c) (UInt32, UnsafeRawPointer?) -> Bool
-    private let sendCommandFn: SendCommandFn?
-
-    init() {
-        guard let bundle = CFBundleCreate(
-            kCFAllocatorDefault,
-            URL(fileURLWithPath: "/System/Library/PrivateFrameworks/MediaRemote.framework") as CFURL
-        ) else {
-            sendCommandFn = nil
-            return
-        }
-
-        if let ptr = CFBundleGetFunctionPointerForName(bundle, "MRMediaRemoteSendCommand" as CFString) {
-            sendCommandFn = unsafeBitCast(ptr, to: SendCommandFn.self)
-        } else {
-            sendCommandFn = nil
-        }
-    }
-
-    @discardableResult
-    func sendCommand(_ command: Command) -> Bool {
-        sendCommandFn?(command.rawValue, nil) ?? false
-    }
-}

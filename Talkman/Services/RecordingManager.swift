@@ -82,19 +82,23 @@ final class RecordingManager {
         guard !isRecording, transcriptionService.isModelLoaded else { return }
 
         outputService.rememberSourceApp()
-        transcriptionService.startTranscription()
+
+        Task { @MainActor in
+            await transcriptionService.startTranscription()
+            self.beginCapture()
+        }
+    }
+
+    private func beginCapture() {
+        guard !isRecording else { return }
 
         do {
             try audioCaptureService.startCapture(
                 onBuffer: { [weak self] buffer in
-                    // Copy samples immediately — the buffer is only valid inside this callback
-                    guard let channelData = buffer.floatChannelData else { return }
-                    let frameLength = Int(buffer.frameLength)
-                    guard frameLength > 0 else { return }
-                    let samples = Array(UnsafeBufferPointer(start: channelData[0], count: frameLength))
+                    nonisolated(unsafe) let sendableBuffer = buffer
                     Task { @MainActor in
                         guard let self else { return }
-                        await self.transcriptionService.processAudioSamples(samples)
+                        await self.transcriptionService.processAudioBuffer(sendableBuffer)
                     }
                 },
                 onLevel: { [weak self] level in
@@ -173,6 +177,6 @@ enum SoundFeedback {
     }
 
     static func playStop() {
-        NSSound(named: "Pop")?.play()
+        NSSound(named: "Bottle")?.play()
     }
 }
