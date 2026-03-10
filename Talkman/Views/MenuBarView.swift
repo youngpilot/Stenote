@@ -318,7 +318,7 @@ struct MenuBarView: View {
         let s = SettingsStore.shared
         let r = TextReplacementService.shared
 
-        if s.hotkey != .doubleRightCmd { items.append("Shortcut: \(s.hotkey.label) → Double-press Right ⌘") }
+        if s.hotkey != .doubleRightOption { items.append("Shortcut: \(s.hotkey.label) → Double-press Right ⌥") }
         if !s.enableITN { items.append("Number formatting: off → on") }
         if s.vadSensitivity != .normal { items.append("Pause sensitivity: \(s.vadSensitivity.label) → Normal") }
         if s.autoStopTimeout != .thirty { items.append("Auto-stop: \(s.autoStopTimeout.label) → 30s") }

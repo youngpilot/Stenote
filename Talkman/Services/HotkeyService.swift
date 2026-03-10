@@ -9,7 +9,7 @@ final class HotkeyService {
     private var keyMonitor: Any?
     private var lastDoublePressTime: Date?
     private let doublePressInterval: TimeInterval = 0.4
-    private var currentHotkey: HotkeyChoice = .doubleRightCmd
+    private var currentHotkey: HotkeyChoice = .doubleRightOption
 
     var onToggle: (() -> Void)?
 
@@ -44,6 +44,10 @@ final class HotkeyService {
 
     private func handleFlagsChanged(_ event: NSEvent) {
         switch currentHotkey {
+        case .doubleRightOption:
+            // Right Option keyCode is 61; check if Option flag is now set (key-down moment)
+            guard event.keyCode == 61, event.modifierFlags.contains(.option) else { return }
+            checkDoublePress()
         case .doubleRightCmd:
             // Right Cmd keyCode is 54; check if Cmd flag is now set (key-down moment)
             guard event.keyCode == 54, event.modifierFlags.contains(.command) else { return }

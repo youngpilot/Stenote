@@ -377,21 +377,26 @@ final class TranscriptionService {
     }
 
     private func stopAccurateMode() async {
+        // Cancel streaming updates FIRST — prevents race where updates fire
+        // during finish() and then finish() re-pastes overlapping text
+        updateTask?.cancel()
+        updateTask = nil
+
         if let asr = streamingAsr {
+            // Drain in-flight audio Tasks before finish() closes the input stream.
+            // Audio tap creates Tasks on MainActor that call streamAudio().
+            // Without this yield, finish() calls inputBuilder.finish() synchronously
+            // and pending audio Tasks find the builder already closed → audio lost.
+            try? await Task.sleep(for: .milliseconds(50))
+
             do {
                 let finalText = try await asr.finish()
                 let trimmed = finalText.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !trimmed.isEmpty {
                     let corrected = textReplacement.applyReplacements(to: trimmed)
-                    let newText: String
-                    if corrected.hasPrefix(lastConfirmedText) {
-                        newText = String(corrected.dropFirst(lastConfirmedText.count))
-                            .trimmingCharacters(in: .whitespaces)
-                    } else {
-                        newText = corrected
-                    }
+                    let newText = extractUnpastedTail(final: corrected, confirmed: lastConfirmedText)
+
                     if !newText.isEmpty {
-                        // Detect language
                         let recognizer = NLLanguageRecognizer()
                         recognizer.processString(newText)
                         if let lang = recognizer.dominantLanguage?.rawValue {
@@ -405,18 +410,53 @@ final class TranscriptionService {
                             isFinal: true
                         )
                         segments.append(segment)
-                        currentText = segments.map(\.text).joined(separator: " ")
                         onSegmentReady?(newText)
                     }
+                    // Always use the definitive final text for display/history
+                    currentText = corrected
                 }
             } catch {
                 logger.error("Streaming ASR finish error: \(error)")
             }
         }
 
-        updateTask?.cancel()
-        updateTask = nil
         streamingAsr = nil
+    }
+
+    /// Compare final text to what was already confirmed/pasted, return only the new tail.
+    /// Uses word-level comparison ignoring punctuation so re-punctuated text still matches.
+    private func extractUnpastedTail(final: String, confirmed: String) -> String {
+        // Fast path: exact prefix match
+        if final.hasPrefix(confirmed) {
+            return String(final.dropFirst(confirmed.count))
+                .trimmingCharacters(in: .whitespaces)
+        }
+
+        guard !confirmed.isEmpty else { return final }
+
+        // Word-level comparison ignoring punctuation differences
+        let confirmedWords = confirmed.split(whereSeparator: \.isWhitespace)
+        let finalWords = final.split(whereSeparator: \.isWhitespace)
+
+        var matched = 0
+        for (cw, fw) in zip(confirmedWords, finalWords) {
+            let cwClean = cw.filter { !$0.isPunctuation }
+            let fwClean = fw.filter { !$0.isPunctuation }
+            if cwClean.lowercased() == fwClean.lowercased() {
+                matched += 1
+            } else {
+                break
+            }
+        }
+
+        if matched >= confirmedWords.count {
+            // All confirmed words matched — return the remaining words
+            return finalWords.dropFirst(matched).joined(separator: " ")
+        }
+
+        // Can't determine overlap — skip to avoid duplication
+        logger.info("Cannot match confirmed text (\(matched)/\(confirmedWords.count) words), skipping paste")
+        return ""
     }
 
     private func handleStreamingUpdate(_ update: StreamingTranscriptionUpdate) {

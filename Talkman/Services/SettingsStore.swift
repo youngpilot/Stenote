@@ -77,6 +77,7 @@ enum TranscriptionMode: String, CaseIterable, Identifiable {
 }
 
 enum HotkeyChoice: String, CaseIterable, Identifiable {
+    case doubleRightOption = "doubleRightOption"
     case doubleRightCmd = "doubleRightCmd"
     case optionSpace = "optionSpace"
     case fnSpace = "fnSpace"
@@ -87,6 +88,7 @@ enum HotkeyChoice: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
+        case .doubleRightOption: "Double-press Right ⌥"
         case .doubleRightCmd: "Double-press Right ⌘"
         case .optionSpace: "⌥Space"
         case .fnSpace: "Fn+Space"
@@ -171,7 +173,7 @@ final class SettingsStore {
 
     func resetToDefaults() {
         enableITN = true
-        hotkey = .doubleRightCmd
+        hotkey = .doubleRightOption
         politenessMode = false
         prefixText = ""
         suffixText = ""
@@ -185,7 +187,7 @@ final class SettingsStore {
     private init() {
         let ud = UserDefaults.standard
         self.enableITN = ud.object(forKey: "enableITN") == nil ? true : ud.bool(forKey: "enableITN")
-        self.hotkey = HotkeyChoice(rawValue: ud.string(forKey: "hotkey") ?? "") ?? .doubleRightCmd
+        self.hotkey = HotkeyChoice(rawValue: ud.string(forKey: "hotkey") ?? "") ?? .doubleRightOption
         self.politenessMode = ud.bool(forKey: "politenessMode")
         self.suffixText = ud.string(forKey: "suffixText") ?? ""
         self.prefixText = ud.string(forKey: "prefixText") ?? ""
