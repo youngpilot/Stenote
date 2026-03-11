@@ -44,7 +44,7 @@ Talkman works in **any text field, in any app** — your editor, browser, termin
 
 ## Install
 
-1. Download `Talkman-0.3.0.dmg` from the [latest release](https://github.com/youngpilot/Talkman/releases/latest)
+1. Download `Talkman-0.5.2.dmg` from the [latest release](https://github.com/youngpilot/Talkman/releases/latest)
 2. Open the DMG and drag Talkman to Applications
 3. Launch Talkman — grant Microphone and Accessibility permissions when prompted
 4. The ASR model downloads automatically on first launch (~200MB)
@@ -53,9 +53,9 @@ Requires **macOS 15.2+** and **Apple Silicon** (M1 or later).
 
 ## Usage
 
-1. **Double-press Right Cmd** (or your configured hotkey) to start recording
+1. **Double-press Right ⌥** (or your configured hotkey) to start recording
 2. Speak naturally — Talkman detects speech pauses and transcribes on-device
-3. Text is pasted live into whatever app was focused when you started
+3. Text is pasted into whatever app was focused when you started
 4. Press the hotkey again, or let auto-stop end the session after silence
 
 You can also **right-click the menubar icon** to toggle recording, or **left-click** to open the settings panel.
@@ -70,13 +70,14 @@ The mic icon turns red while recording.
 
 ## Features
 
-- **Real-time transcription** — text appears live as you speak, triggered by natural speech pauses (VAD-based)
+- **Two transcription modes** — *Accurate* (default): max accuracy, text appears after multiple sentences. *Live*: text appears phrase by phrase as you speak.
 - **25 languages, auto-detected** — speak in any supported language and Talkman recognizes it automatically. No language switching needed.
 - **Menubar-only** — lives in your menu bar, no dock icon, no windows, out of your way
-- **Global hotkey** — double-press Right Cmd to toggle recording (configurable: Fn, F5, F6, Ctrl+Shift+Space)
+- **Global hotkey** — double-press Right ⌥ to toggle recording (configurable: Right ⌘, ⌥ + Space, Fn + Space, F5, Fn/🌐 — multiple shortcuts can be active simultaneously)
 - **Right-click to record** — right-click the menubar icon to start/stop recording
+- **Media playback control** — automatically pauses Spotify or Apple Music while recording and resumes after
 - **Smart clipboard** — uses concealed pasteboard type so clipboard managers (Maccy, Paste, Alfred) ignore transcription pastes; restores your clipboard after each session
-- **Brand name corrections** — teach Talkman your brand names with custom word replacements + vocabulary boosting
+- **Word corrections** — teach Talkman your brand names with custom word replacements + vocabulary boosting
 - **Paragraph breaks** — automatically inserts paragraph breaks after 2.5s+ pauses
 - **Auto-stop** — configurable silence timeout (10s-60s or off)
 - **Prefix/suffix text** — automatically prepend or append text to each transcription
