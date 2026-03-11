@@ -31,7 +31,7 @@ struct MenuBarView: View {
         // Top bar: Shortcut hint + Settings + Quit
         HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(settings.hotkeys.map { $0.label }.sorted().joined(separator: ", "))
+                Text(HotkeyChoice.allCases.filter { settings.hotkeys.contains($0) }.map { $0.label }.joined(separator: " or "))
                     .font(.body)
                     .fontWeight(.medium)
                 Text("Right-click the menubar icon")
