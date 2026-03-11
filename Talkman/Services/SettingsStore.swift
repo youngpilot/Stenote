@@ -63,8 +63,8 @@ enum MediaPlaybackOption: String, CaseIterable, Identifiable {
 }
 
 enum TranscriptionMode: String, CaseIterable, Identifiable {
-    case live = "live"
     case accurate = "accurate"
+    case live = "live"
 
     var id: String { rawValue }
 
@@ -90,8 +90,8 @@ enum HotkeyChoice: String, CaseIterable, Identifiable {
         switch self {
         case .doubleRightOption: "Double-press Right ⌥"
         case .doubleRightCmd: "Double-press Right ⌘"
-        case .optionSpace: "⌥Space"
-        case .fnSpace: "Fn+Space"
+        case .optionSpace: "⌥ + Space"
+        case .fnSpace: "Fn + Space"
         case .f5: "F5"
         case .doubleFn: "Double-press Fn/🌐"
         }
@@ -123,10 +123,10 @@ final class SettingsStore {
         }
     }
 
-    var hotkey: HotkeyChoice {
+    var hotkeys: Set<HotkeyChoice> {
         didSet {
-            UserDefaults.standard.set(hotkey.rawValue, forKey: "hotkey")
-            onHotkeyChanged?(hotkey)
+            UserDefaults.standard.set(Array(hotkeys.map { $0.rawValue }), forKey: "hotkeys")
+            onHotkeyChanged?(hotkeys)
         }
     }
 
@@ -169,11 +169,11 @@ final class SettingsStore {
         didSet { UserDefaults.standard.set(transcriptionMode.rawValue, forKey: "transcriptionMode") }
     }
 
-    var onHotkeyChanged: ((HotkeyChoice) -> Void)?
+    var onHotkeyChanged: ((Set<HotkeyChoice>) -> Void)?
 
     func resetToDefaults() {
         enableITN = true
-        hotkey = .doubleRightOption
+        hotkeys = [.doubleRightOption]
         politenessMode = false
         prefixText = ""
         suffixText = ""
@@ -187,7 +187,15 @@ final class SettingsStore {
     private init() {
         let ud = UserDefaults.standard
         self.enableITN = ud.object(forKey: "enableITN") == nil ? true : ud.bool(forKey: "enableITN")
-        self.hotkey = HotkeyChoice(rawValue: ud.string(forKey: "hotkey") ?? "") ?? .doubleRightOption
+        // Migrate from old single "hotkey" key if needed
+        if let rawValues = ud.stringArray(forKey: "hotkeys") {
+            let parsed = Set(rawValues.compactMap { HotkeyChoice(rawValue: $0) })
+            self.hotkeys = parsed.isEmpty ? [.doubleRightOption] : parsed
+        } else if let legacy = ud.string(forKey: "hotkey").flatMap({ HotkeyChoice(rawValue: $0) }) {
+            self.hotkeys = [legacy]
+        } else {
+            self.hotkeys = [.doubleRightOption]
+        }
         self.politenessMode = ud.bool(forKey: "politenessMode")
         self.suffixText = ud.string(forKey: "suffixText") ?? ""
         self.prefixText = ud.string(forKey: "prefixText") ?? ""

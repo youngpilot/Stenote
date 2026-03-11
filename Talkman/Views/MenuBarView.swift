@@ -31,7 +31,7 @@ struct MenuBarView: View {
         // Top bar: Shortcut hint + Settings + Quit
         HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(settings.hotkey.label)
+                Text(settings.hotkeys.map { $0.label }.sorted().joined(separator: ", "))
                     .font(.body)
                     .fontWeight(.medium)
                 Text("Right-click the menubar icon")
@@ -318,7 +318,7 @@ struct MenuBarView: View {
         let s = SettingsStore.shared
         let r = TextReplacementService.shared
 
-        if s.hotkey != .doubleRightOption { items.append("Shortcut: \(s.hotkey.label) → Double-press Right ⌥") }
+        if s.hotkeys != [.doubleRightOption] { items.append("Shortcuts → Double-press Right ⌥ only") }
         if !s.enableITN { items.append("Number formatting: off → on") }
         if s.vadSensitivity != .normal { items.append("Pause sensitivity: \(s.vadSensitivity.label) → Normal") }
         if s.autoStopTimeout != .thirty { items.append("Auto-stop: \(s.autoStopTimeout.label) → 30s") }
@@ -397,15 +397,17 @@ private struct AudioLevelView: View {
 // MARK: - Settings Card
 
 private struct SettingsCard<Content: View>: View {
-    let title: String
+    var title: String? = nil
     @ViewBuilder var content: () -> Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.s) {
-            Text(title)
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .fontWeight(.medium)
+            if let title {
+                Text(title)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .fontWeight(.medium)
+            }
             content()
         }
         .padding(DesignTokens.Spacing.s)
@@ -423,50 +425,68 @@ private struct InlineSettingsView: View {
     @State private var newFrom = ""
     @State private var newTo = ""
     @State private var showFnKeyHint = false
+    @State private var showShortcutPicker = false
 
     private let labelFont = Font.body
 
     var body: some View {
         VStack(spacing: DesignTokens.Spacing.s) {
             // General
-            SettingsCard(title: "General") {
+            SettingsCard {
                 Toggle("Launch at Login", isOn: Binding(
                     get: { settings.launchAtLogin },
                     set: { settings.launchAtLogin = $0 }
                 ))
                 .font(labelFont)
 
-                settingsRow("Shortcut") {
-                    Picker("", selection: Binding(
-                        get: { settings.hotkey },
-                        set: { newValue in
-                            settings.hotkey = newValue
-                            showFnKeyHint = newValue.needsFunctionKeyHint
-                        }
-                    )) {
-                        ForEach(HotkeyChoice.allCases) { choice in
-                            Text(choice.label).tag(choice)
-                        }
-                    }
-                    .labelsHidden()
-                    .fixedSize()
-                }
-
-                if showFnKeyHint || settings.hotkey.needsFunctionKeyHint {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Label("Enable standard function keys", systemImage: "info.circle.fill")
-                            .foregroundStyle(.blue)
-                        Text("To press \(settings.hotkey.label) without holding Fn:\nSystem Settings → Keyboard → \"Use F1, F2, etc. as standard function keys\"")
-                            .foregroundStyle(.secondary)
-                        Button("Open Keyboard Settings") {
-                            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!)
-                        }
-                        .buttonStyle(.link)
+                Button {
+                    showShortcutPicker.toggle()
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("Shortcut: " + HotkeyChoice.allCases
+                            .filter { settings.hotkeys.contains($0) }
+                            .map { $0.label }
+                            .joined(separator: " or "))
+                        Image(systemName: "chevron.right")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
                     }
                     .font(labelFont)
-                    .padding(DesignTokens.Spacing.s)
-                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6))
-                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.blue.opacity(0.3), lineWidth: 0.5))
+                }
+                .buttonStyle(.bordered)
+                .popover(isPresented: $showShortcutPicker, arrowEdge: .trailing) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(HotkeyChoice.allCases) { choice in
+                            Toggle(choice.label, isOn: Binding(
+                                get: { settings.hotkeys.contains(choice) },
+                                set: { enabled in
+                                    var updated = settings.hotkeys
+                                    if enabled {
+                                        updated.insert(choice)
+                                    } else if updated.count > 1 {
+                                        updated.remove(choice)
+                                    }
+                                    settings.hotkeys = updated
+                                    showFnKeyHint = updated.contains(.f5)
+                                }
+                            ))
+                            .toggleStyle(.checkbox)
+                        }
+                        if showFnKeyHint || settings.hotkeys.contains(.f5) {
+                            Divider()
+                            Label("Enable standard function keys", systemImage: "info.circle.fill")
+                                .foregroundStyle(.blue)
+                            Text("System Settings → Keyboard →\n\"Use F1, F2, etc. as standard function keys\"")
+                                .foregroundStyle(.secondary)
+                            Button("Open Keyboard Settings") {
+                                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!)
+                            }
+                            .buttonStyle(.link)
+                        }
+                    }
+                    .font(labelFont)
+                    .padding(12)
+                    .frame(minWidth: 220)
                 }
             }
 
@@ -486,12 +506,18 @@ private struct InlineSettingsView: View {
                     .fixedSize()
                 }
 
-                Text(settings.transcriptionMode == .live
-                     ? "Text appears as you speak, phrase by phrase."
-                     : "Text appears when you stop. Max accuracy.")
-                    .font(labelFont)
-                    .foregroundStyle(.tertiary)
-                    .fixedSize(horizontal: false, vertical: true)
+                if settings.transcriptionMode == .live {
+                    Label("Accuracy is reduced.", systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                        .font(labelFont)
+                    Text("Text appears as you speak, phrase by phrase.")
+                        .font(labelFont)
+                        .foregroundStyle(.tertiary)
+                } else {
+                    Text("Text appears after multiple sentences.")
+                        .font(labelFont)
+                        .foregroundStyle(.tertiary)
+                }
 
                 settingsRow("Media Playback") {
                     Picker("", selection: Binding(
@@ -598,7 +624,7 @@ private struct InlineSettingsView: View {
 
             // Word Corrections
             SettingsCard(title: "Word Corrections") {
-                Text("Wrong → Right corrections always work. Boost-only words (no \"Wrong\") need Boosting enabled.")
+                Text("Wrong → Right corrections always work. Boost-only words (no \"Wrong\") need Model Boosting enabled.")
                     .font(labelFont)
                     .foregroundStyle(.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
