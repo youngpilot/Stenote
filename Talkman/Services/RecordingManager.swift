@@ -145,9 +145,6 @@ final class RecordingManager {
         // ending the session.
         let finalText = await transcriptionService.stopTranscription()
 
-        // Yield to let any pending onSegmentReady Tasks execute
-        await Task.yield()
-
         // Append suffix text if configured
         let suffix = SettingsStore.shared.suffixText
         if !suffix.isEmpty, !finalText.isEmpty {
@@ -163,8 +160,15 @@ final class RecordingManager {
             historyService.addEntry(historyText)
         }
 
-        // Flush any remaining text before ending session
-        outputService.flushPendingText()
+        // Wait for all pending pastes to complete before ending session.
+        // doPaste uses async DispatchQueue drains (scheduleDrain +20ms, activate +60ms)
+        // so isPasting stays true until the full chain completes.
+        for _ in 0..<20 {
+            if !outputService.hasPendingOutput { break }
+            outputService.flushPendingText()
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+
         outputService.endSession()
     }
 }

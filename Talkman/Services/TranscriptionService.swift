@@ -38,7 +38,7 @@ final class TranscriptionService {
     private var isTranscribing_ASR = false
 
     // --- Accurate mode state ---
-    private var lastConfirmedText = ""
+    private var lastConfirmedText = ""  // used for volatile preview diff
     private var updateTask: Task<Void, Never>?
 
     // --- Shared VAD state ---
@@ -394,26 +394,17 @@ final class TranscriptionService {
                 let trimmed = finalText.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !trimmed.isEmpty {
                     let corrected = textReplacement.applyReplacements(to: trimmed)
-                    let newText = extractUnpastedTail(final: corrected, confirmed: lastConfirmedText)
 
-                    if !newText.isEmpty {
-                        let recognizer = NLLanguageRecognizer()
-                        recognizer.processString(newText)
-                        if let lang = recognizer.dominantLanguage?.rawValue {
-                            detectedLanguage = String(lang.prefix(2))
-                        }
-
-                        let segment = TranscriptionSegment(
-                            text: newText,
-                            timestamp: Date(),
-                            language: detectedLanguage.isEmpty ? nil : detectedLanguage,
-                            isFinal: true
-                        )
-                        segments.append(segment)
-                        onSegmentReady?(newText)
+                    let recognizer = NLLanguageRecognizer()
+                    recognizer.processString(corrected)
+                    if let lang = recognizer.dominantLanguage?.rawValue {
+                        detectedLanguage = String(lang.prefix(2))
                     }
-                    // Always use the definitive final text for display/history
+
                     currentText = corrected
+                    // Paste the full finish() text in one shot — no comparison needed.
+                    // Streaming confirmed updates only update the UI; paste is deferred to here.
+                    onSegmentReady?(corrected)
                 }
             } catch {
                 logger.error("Streaming ASR finish error: \(error)")
@@ -423,42 +414,6 @@ final class TranscriptionService {
         streamingAsr = nil
     }
 
-    /// Compare final text to what was already confirmed/pasted, return only the new tail.
-    /// Uses word-level comparison ignoring punctuation so re-punctuated text still matches.
-    private func extractUnpastedTail(final: String, confirmed: String) -> String {
-        // Fast path: exact prefix match
-        if final.hasPrefix(confirmed) {
-            return String(final.dropFirst(confirmed.count))
-                .trimmingCharacters(in: .whitespaces)
-        }
-
-        guard !confirmed.isEmpty else { return final }
-
-        // Word-level comparison ignoring punctuation differences
-        let confirmedWords = confirmed.split(whereSeparator: \.isWhitespace)
-        let finalWords = final.split(whereSeparator: \.isWhitespace)
-
-        var matched = 0
-        for (cw, fw) in zip(confirmedWords, finalWords) {
-            let cwClean = cw.filter { !$0.isPunctuation }
-            let fwClean = fw.filter { !$0.isPunctuation }
-            if cwClean.lowercased() == fwClean.lowercased() {
-                matched += 1
-            } else {
-                break
-            }
-        }
-
-        if matched >= confirmedWords.count {
-            // All confirmed words matched — return the remaining words
-            return finalWords.dropFirst(matched).joined(separator: " ")
-        }
-
-        // Can't determine overlap — skip to avoid duplication
-        logger.info("Cannot match confirmed text (\(matched)/\(confirmedWords.count) words), skipping paste")
-        return ""
-    }
-
     private func handleStreamingUpdate(_ update: StreamingTranscriptionUpdate) {
         let rawText = update.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !rawText.isEmpty else { return }
@@ -466,35 +421,10 @@ final class TranscriptionService {
         let corrected = textReplacement.applyReplacements(to: rawText)
 
         if update.isConfirmed {
-            let newText: String
-            if corrected.hasPrefix(lastConfirmedText) {
-                newText = String(corrected.dropFirst(lastConfirmedText.count))
-                    .trimmingCharacters(in: .whitespaces)
-            } else {
-                newText = corrected
-            }
+            // In Accurate mode, paste happens in one batch at finish() — not here.
+            // Just update the UI preview so the user sees text growing during recording.
             lastConfirmedText = corrected
-
-            guard !newText.isEmpty else { return }
-
-            let recognizer = NLLanguageRecognizer()
-            recognizer.processString(newText)
-            if let lang = recognizer.dominantLanguage?.rawValue {
-                detectedLanguage = String(lang.prefix(2))
-            }
-
-            let segment = TranscriptionSegment(
-                text: newText,
-                timestamp: Date(),
-                language: detectedLanguage.isEmpty ? nil : detectedLanguage,
-                isFinal: true
-            )
-            segments.append(segment)
-            currentText = segments.map(\.text).joined(separator: " ")
-
-            let prefix = pendingParagraphBreak ? "\n\n" : ""
-            pendingParagraphBreak = false
-            onSegmentReady?(prefix + newText)
+            currentText = corrected
         } else {
             // Volatile — show as preview
             if corrected.hasPrefix(lastConfirmedText) {

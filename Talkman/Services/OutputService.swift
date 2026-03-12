@@ -160,6 +160,10 @@ final class OutputService {
         savedClipboardString = nil
     }
 
+    var hasPendingOutput: Bool {
+        isPasting || !pendingText.isEmpty
+    }
+
     func flushPendingText() {
         guard !pendingText.isEmpty, let sourceApp, !isPasting else { return }
         doPaste(to: sourceApp)

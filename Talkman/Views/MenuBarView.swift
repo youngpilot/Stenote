@@ -514,7 +514,7 @@ private struct InlineSettingsView: View {
                         .font(labelFont)
                         .foregroundStyle(.tertiary)
                 } else {
-                    Text("Text appears after multiple sentences.")
+                    Text("Text appears when you stop. Max accuracy.")
                         .font(labelFont)
                         .foregroundStyle(.tertiary)
                 }
