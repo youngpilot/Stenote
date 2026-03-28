@@ -8,8 +8,10 @@ struct MenuBarView: View {
     @State private var showSettings = false
     @State private var copiedHistoryId: UUID?
     @State private var hoveredHistoryId: UUID?
+    @State private var expandedHistoryId: UUID?
     @State private var showResetConfirm = false
     @State private var historyPage = 0
+    @State private var hoveringRecordings = false
 
     var body: some View {
         VStack(spacing: DesignTokens.Spacing.m) {
@@ -48,25 +50,21 @@ struct MenuBarView: View {
                 }
             } label: {
                 Image(systemName: "gearshape.fill")
-                    .font(.system(size: 13))
-                    .frame(width: 28, height: 28)
-                    .contentShape(Rectangle())
+                    .frame(width: 16)
             }
             .keyboardShortcut(",", modifiers: .command)
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
+            .buttonStyle(.bordered)
+            .controlSize(.regular)
 
             Button {
                 NSApplication.shared.terminate(nil)
             } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .semibold))
-                    .frame(width: 28, height: 28)
-                    .contentShape(Rectangle())
+                    .frame(width: 16)
             }
             .keyboardShortcut("q", modifiers: .command)
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
+            .buttonStyle(.bordered)
+            .controlSize(.regular)
         }
 
         // Model loading progress
@@ -165,105 +163,7 @@ struct MenuBarView: View {
         // History
         if !recordingManager.historyService.entries.isEmpty {
             Divider()
-
-            TimelineView(.periodic(from: .now, by: 60)) { _ in
-                let allEntries = recordingManager.historyService.entries
-                let pageSize = 5
-                let totalPages = max(1, (allEntries.count + pageSize - 1) / pageSize)
-                let safePage = min(historyPage, totalPages - 1)
-                let pageEntries = Array(allEntries.dropFirst(safePage * pageSize).prefix(pageSize))
-
-                VStack(spacing: DesignTokens.Spacing.xs) {
-                    // Header: title, count, pagination, clear
-                    HStack(spacing: 6) {
-                        Text("Recordings")
-                            .font(.body)
-                            .foregroundStyle(.secondary)
-                            .fontWeight(.medium)
-                        Text("\(allEntries.count)")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-
-                        if totalPages > 1 {
-                            Button {
-                                historyPage = max(0, historyPage - 1)
-                            } label: {
-                                Image(systemName: "chevron.left")
-                                    .font(.caption2)
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.mini)
-                            .disabled(safePage == 0)
-
-                            Text("\(safePage + 1)/\(totalPages)")
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                                .monospacedDigit()
-
-                            Button {
-                                historyPage = min(totalPages - 1, historyPage + 1)
-                            } label: {
-                                Image(systemName: "chevron.right")
-                                    .font(.caption2)
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.mini)
-                            .disabled(safePage >= totalPages - 1)
-                        }
-
-                        Spacer()
-
-                        Button("Clear") {
-                            recordingManager.historyService.clearHistory()
-                            historyPage = 0
-                        }
-                        .font(.body)
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                    }
-
-                    ForEach(pageEntries) { entry in
-                        Button {
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(entry.text, forType: .string)
-                            copiedHistoryId = entry.id
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                                if copiedHistoryId == entry.id {
-                                    copiedHistoryId = nil
-                                }
-                            }
-                        } label: {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(copiedHistoryId == entry.id ? "Copied!" : entry.text)
-                                    .font(.body)
-                                    .foregroundStyle(copiedHistoryId == entry.id ? .green : .primary)
-                                    .lineLimit(3)
-                                    .truncationMode(.tail)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                HStack(spacing: 4) {
-                                    if let duration = entry.duration {
-                                        Text(formatDuration(duration))
-                                            .fontWeight(.medium)
-                                            .foregroundStyle(durationColor(duration))
-                                    }
-                                    Text(entry.timestamp, format: .relative(presentation: .named))
-                                    Text("·")
-                                    Text("\(entry.text.count) chars")
-                                }
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .padding(DesignTokens.Spacing.s)
-                        .background(hoveredHistoryId == entry.id ? AnyShapeStyle(.thinMaterial) : AnyShapeStyle(.ultraThinMaterial), in: RoundedRectangle(cornerRadius: 8))
-                        .onHover { hovering in hoveredHistoryId = hovering ? entry.id : nil }
-                    }
-                }
-            }
-            .onChange(of: recordingManager.historyService.entries.count) {
-                historyPage = 0
-            }
+            historySection
         }
 
         // Status bar at the bottom
@@ -285,6 +185,17 @@ struct MenuBarView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            if !recordingManager.isRecording, !recordingManager.isModelLoading {
+                let h = recordingManager.historyService
+                if h.totalRecordings > 0 {
+                    Text("\(h.totalRecordings) rec · \(formatDuration(h.totalDuration)) · \(formatCharCount(h.totalCharacters)) chars")
+                        .font(.caption)
+                        .foregroundStyle(.quaternary)
+                    Text("·")
+                        .font(.caption)
+                        .foregroundStyle(.quaternary)
+                }
+            }
             Text("v\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
                 .font(.caption)
                 .foregroundStyle(.quaternary)
@@ -308,7 +219,8 @@ struct MenuBarView: View {
                 } label: {
                     Label("Back", systemImage: "chevron.left")
                 }
-                .font(.body)
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
 
                 Spacer()
 
@@ -316,12 +228,9 @@ struct MenuBarView: View {
                     showResetConfirm = true
                 } label: {
                     Image(systemName: "arrow.counterclockwise")
-                        .font(.system(size: 13))
-                        .frame(width: 28, height: 28)
-                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
                 .help("Reset to Defaults")
             }
         }
@@ -385,14 +294,169 @@ struct MenuBarView: View {
         return "This will reset:\n\n" + items.joined(separator: "\n")
     }
 
+    // MARK: - History
+
+    @ViewBuilder
+    private var historySection: some View {
+        TimelineView(.periodic(from: .now, by: 60)) { _ in
+            let allEntries = recordingManager.historyService.entries
+            let pageSize = 5
+            let totalPages = max(1, (allEntries.count + pageSize - 1) / pageSize)
+            let safePage = min(historyPage, totalPages - 1)
+            let pageEntries = Array(allEntries.dropFirst(safePage * pageSize).prefix(pageSize))
+
+            VStack(spacing: DesignTokens.Spacing.xs) {
+                historyHeader(totalPages: totalPages, safePage: safePage)
+
+                ForEach(pageEntries) { entry in
+                    historyRow(entry)
+                }
+            }
+        }
+        .onChange(of: recordingManager.historyService.entries.count) {
+            historyPage = 0
+        }
+    }
+
+    @ViewBuilder
+    private func historyHeader(totalPages: Int, safePage: Int) -> some View {
+        HStack {
+            Text("Recordings")
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .fontWeight(.medium)
+
+            Spacer()
+
+            if totalPages > 1 {
+                Button {
+                    historyPage = max(0, historyPage - 1)
+                } label: {
+                    Image(systemName: "chevron.left")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+                .disabled(safePage == 0)
+
+                Text("\(safePage + 1)/\(totalPages)")
+                    .font(.body)
+                    .foregroundStyle(.tertiary)
+                    .monospacedDigit()
+
+                Button {
+                    historyPage = min(totalPages - 1, historyPage + 1)
+                } label: {
+                    Image(systemName: "chevron.right")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+                .disabled(safePage >= totalPages - 1)
+            }
+
+            Spacer()
+
+            Button("Clear") {
+                recordingManager.historyService.clearHistory()
+                historyPage = 0
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.regular)
+        }
+    }
+
+    @ViewBuilder
+    private func historyRow(_ entry: HistoryEntry) -> some View {
+        let isExpanded = expandedHistoryId == entry.id
+        HStack(alignment: .top, spacing: 6) {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    if let rid = entry.recordingId {
+                        Text("#\(rid)")
+                            .fontWeight(.medium)
+                            .foregroundStyle(.secondary)
+                    }
+                    if entry.recordingId != nil, entry.duration != nil {
+                        Text("·").foregroundStyle(.quaternary)
+                    }
+                    if let duration = entry.duration {
+                        Text(formatDuration(duration))
+                            .fontWeight(.medium)
+                            .foregroundStyle(durationColor(duration))
+                    }
+                    Text("·").foregroundStyle(.quaternary)
+                    Text(roughTimestamp(entry.timestamp))
+                    Text("·").foregroundStyle(.quaternary)
+                    Text("\(entry.text.count) chars")
+                }
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+
+                Text(entry.text)
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                    .lineLimit(isExpanded ? 7 : 3)
+                    .truncationMode(.tail)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    expandedHistoryId = isExpanded ? nil : entry.id
+                }
+            }
+
+            VStack {
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(entry.text, forType: .string)
+                    copiedHistoryId = entry.id
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        if copiedHistoryId == entry.id {
+                            copiedHistoryId = nil
+                        }
+                    }
+                } label: {
+                    Image(systemName: copiedHistoryId == entry.id ? "checkmark" : "doc.on.doc")
+                        .font(.caption)
+                        .foregroundStyle(copiedHistoryId == entry.id ? AnyShapeStyle(.green) : AnyShapeStyle(.tertiary))
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                    .font(.caption2)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.secondary)
+                    .opacity(hoveredHistoryId == entry.id ? 1 : 0)
+            }
+        }
+        .padding(DesignTokens.Spacing.s)
+        .background(hoveredHistoryId == entry.id ? AnyShapeStyle(.thinMaterial) : AnyShapeStyle(.ultraThinMaterial), in: RoundedRectangle(cornerRadius: 8))
+        .onHover { hovering in hoveredHistoryId = hovering ? entry.id : nil }
+    }
+
     // MARK: - Helpers
 
     private func formatDuration(_ duration: TimeInterval) -> String {
         let seconds = Int(duration)
         if seconds < 60 {
-            return "0:\(String(format: "%02d", seconds))"
+            return "0:\(String(format: "%02d", seconds))m"
         }
-        return "\(seconds / 60):\(String(format: "%02d", seconds % 60))"
+        if seconds < 3600 {
+            return "\(seconds / 60):\(String(format: "%02d", seconds % 60))m"
+        }
+        let h = seconds / 3600
+        let m = (seconds % 3600) / 60
+        return "\(h):\(String(format: "%02d", m)):\(String(format: "%02d", seconds % 60))h"
+    }
+
+    private func formatCharCount(_ count: Int) -> String {
+        if count < 1000 { return "\(count)" }
+        return String(format: "%.1fk", Double(count) / 1000)
     }
 
     private func durationColor(_ duration: TimeInterval) -> Color {
@@ -400,6 +464,29 @@ struct MenuBarView: View {
         if duration < 30 { return .green }
         if duration < 60 { return .orange }
         return .purple
+    }
+
+    private func roughTimestamp(_ date: Date) -> String {
+        let seconds = Int(Date().timeIntervalSince(date))
+        if seconds < 60 { return "\(seconds)s ago" }
+        let minutes = seconds / 60
+        if minutes < 5 { return "\(minutes)m ago" }
+        if minutes < 10 { return "5m ago" }
+        if minutes < 20 { return "15m ago" }
+        if minutes < 40 { return "30m ago" }
+        if minutes < 60 { return "45m ago" }
+        let hours = minutes / 60
+        if hours == 1 { return "1 hour ago" }
+        if hours < 5 {
+            let halfHours = (minutes + 15) / 30
+            let h = halfHours / 2
+            if halfHours % 2 == 1 { return "\(h).5 hours ago" }
+            return "\(h) hours ago"
+        }
+        if hours < 24 { return "\(hours) hours ago" }
+        let days = hours / 24
+        if days == 1 { return "yesterday" }
+        return "\(days) days ago"
     }
 
     private var statusText: String {

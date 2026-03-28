@@ -6,12 +6,14 @@ struct HistoryEntry: Codable, Identifiable {
     let timestamp: Date
     let text: String
     let duration: TimeInterval?
+    let recordingId: Int?
 
-    init(text: String, duration: TimeInterval? = nil) {
+    init(text: String, duration: TimeInterval? = nil, recordingId: Int? = nil) {
         self.id = UUID()
         self.timestamp = Date()
         self.text = text
         self.duration = duration
+        self.recordingId = recordingId
     }
 }
 
@@ -21,24 +23,39 @@ final class HistoryService {
     static let shared = HistoryService()
 
     private(set) var entries: [HistoryEntry] = []
-    private let maxEntries = 10
+    private(set) var totalRecordings: Int = 0
+    private(set) var totalDuration: TimeInterval = 0
+    private(set) var totalCharacters: Int = 0
+    private let maxEntries = 20
     private let storageKey = "transcriptionHistory"
 
     private init() {
         loadFromDefaults()
+        let ud = UserDefaults.standard
+        totalRecordings = ud.integer(forKey: "totalRecordings")
+        totalDuration = ud.double(forKey: "totalDuration")
+        totalCharacters = ud.integer(forKey: "totalCharacters")
     }
 
     func addEntry(_ text: String, duration: TimeInterval? = nil) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
-        let entry = HistoryEntry(text: trimmed, duration: duration)
+        totalRecordings += 1
+        let entry = HistoryEntry(text: trimmed, duration: duration, recordingId: totalRecordings)
         entries.insert(entry, at: 0)
 
-        // Keep only the last maxEntries
         if entries.count > maxEntries {
             entries = Array(entries.prefix(maxEntries))
         }
+
+        // Update lifetime stats
+        totalCharacters += trimmed.count
+        if let d = duration { totalDuration += d }
+        let ud = UserDefaults.standard
+        ud.set(totalRecordings, forKey: "totalRecordings")
+        ud.set(totalDuration, forKey: "totalDuration")
+        ud.set(totalCharacters, forKey: "totalCharacters")
 
         saveToDefaults()
     }
