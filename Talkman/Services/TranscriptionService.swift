@@ -40,8 +40,8 @@ final class TranscriptionService {
 
     // --- Accurate mode state ---
     private var lastConfirmedText = ""  // used for volatile preview diff
-    private var lastPastedConfirmedText = ""  // tracks what was already pasted incrementally
     private var updateTask: Task<Void, Never>?
+    private var isStopping = false      // guard against stale updates during finish()
 
     // --- Shared VAD state ---
     private var vadBuffer: [Float] = []
@@ -364,17 +364,9 @@ final class TranscriptionService {
         guard let asrModels else { return }
 
         lastConfirmedText = ""
-        lastPastedConfirmedText = ""
+        isStopping = false
 
-        let config = StreamingAsrConfig(
-            chunkSeconds: 15.0,              // Default .streaming=11 — larger chunks = more context
-            hypothesisChunkSeconds: 1.5,     // Default .streaming=1 — slightly larger hypothesis window
-            leftContextSeconds: 3.0,         // Default .streaming=2 — more left context for word boundaries
-            rightContextSeconds: 3.0,        // Default .streaming=2 — more right context
-            minContextForConfirmation: 8.0,  // Default .streaming=10 — confirm sooner
-            confirmationThreshold: 0.82      // Default .streaming=0.80 — slightly stricter
-        )
-        let asr = StreamingAsrManager(config: config)
+        let asr = StreamingAsrManager(config: .streaming)
 
         // Configure vocabulary boosting on streaming manager
         if SettingsStore.shared.enableVocabBoosting, let ctcModels {
@@ -411,17 +403,18 @@ final class TranscriptionService {
     }
 
     private func stopAccurateMode() async {
-        // Cancel streaming updates FIRST — prevents race where updates fire
-        // during finish() and then finish() re-pastes overlapping text
+        // Block stale updates from overwriting currentText during finish()
+        isStopping = true
         updateTask?.cancel()
         updateTask = nil
 
-        if let asr = streamingAsr {
-            // Audio drain is now handled by RecordingManager.drainPendingAudioTasks()
-            // before stopTranscription() is called — no sleep needed here.
+        logger.info("stopAccurateMode: lastConfirmedText=\(self.lastConfirmedText.count) chars")
 
+        if let asr = streamingAsr {
             do {
                 let finalText = try await asr.finish()
+                logger.info("finish() raw=\(finalText.count) chars: \(finalText.prefix(120))…")
+
                 let trimmed = finalText.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !trimmed.isEmpty {
                     var corrected = textReplacement.applyReplacements(to: trimmed)
@@ -435,23 +428,10 @@ final class TranscriptionService {
                     }
 
                     currentText = corrected
-
-                    // Only paste what wasn't already sent incrementally
-                    let remaining: String
-                    if corrected.hasPrefix(lastPastedConfirmedText) {
-                        remaining = String(corrected.dropFirst(lastPastedConfirmedText.count))
-                            .trimmingCharacters(in: .whitespaces)
-                    } else {
-                        // Text diverged from incremental — paste full result
-                        remaining = corrected
-                    }
-
-                    if !remaining.isEmpty {
-                        logger.info("Accurate finish remaining: \(remaining.prefix(80))…")
-                        onSegmentReady?(remaining)
-                    } else {
-                        logger.info("Accurate finish: all text already pasted incrementally")
-                    }
+                    logger.info("Accurate finish (\(corrected.count) chars): \(corrected.prefix(120))…")
+                    onSegmentReady?(corrected)
+                } else {
+                    logger.warning("finish() returned empty text!")
                 }
             } catch {
                 logger.error("Streaming ASR finish error: \(error)")
@@ -494,6 +474,7 @@ final class TranscriptionService {
     }
 
     private func handleStreamingUpdate(_ update: StreamingTranscriptionUpdate) {
+        guard !isStopping else { return }
         let rawText = update.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !rawText.isEmpty else { return }
 
@@ -504,23 +485,7 @@ final class TranscriptionService {
         if update.isConfirmed {
             lastConfirmedText = corrected
             currentText = corrected
-
-            // Paste incrementally when confident enough
-            if update.confidence >= 0.75,
-               corrected.count > lastPastedConfirmedText.count,
-               corrected.hasPrefix(lastPastedConfirmedText) {
-                var newText = String(corrected.dropFirst(lastPastedConfirmedText.count))
-                    .trimmingCharacters(in: .whitespaces)
-                if !newText.isEmpty {
-                    newText = voiceCommands.process(newText)
-                    newText = removeTrailingStutter(newText)
-                    if !newText.isEmpty {
-                        logger.info("Streaming paste: \(newText.prefix(60))…")
-                        onSegmentReady?(newText + " ")
-                        lastPastedConfirmedText = corrected
-                    }
-                }
-            }
+            logger.info("Confirmed (\(corrected.count) chars): \(corrected.prefix(60))…")
         } else {
             // Volatile — show as preview
             if corrected.hasPrefix(lastConfirmedText) {

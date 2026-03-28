@@ -166,21 +166,6 @@ struct MenuBarView: View {
         if !recordingManager.historyService.entries.isEmpty {
             Divider()
 
-            HStack {
-                Text("Recordings")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .fontWeight(.medium)
-                Spacer()
-                Button("Clear") {
-                    recordingManager.historyService.clearHistory()
-                    historyPage = 0
-                }
-                .font(.body)
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-            }
-
             TimelineView(.periodic(from: .now, by: 60)) { _ in
                 let allEntries = recordingManager.historyService.entries
                 let pageSize = 5
@@ -189,6 +174,54 @@ struct MenuBarView: View {
                 let pageEntries = Array(allEntries.dropFirst(safePage * pageSize).prefix(pageSize))
 
                 VStack(spacing: DesignTokens.Spacing.xs) {
+                    // Header: title, count, pagination, clear
+                    HStack(spacing: 6) {
+                        Text("Recordings")
+                            .font(.body)
+                            .foregroundStyle(.secondary)
+                            .fontWeight(.medium)
+                        Text("\(allEntries.count)")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+
+                        if totalPages > 1 {
+                            Button {
+                                historyPage = max(0, historyPage - 1)
+                            } label: {
+                                Image(systemName: "chevron.left")
+                                    .font(.caption2)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.mini)
+                            .disabled(safePage == 0)
+
+                            Text("\(safePage + 1)/\(totalPages)")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                                .monospacedDigit()
+
+                            Button {
+                                historyPage = min(totalPages - 1, historyPage + 1)
+                            } label: {
+                                Image(systemName: "chevron.right")
+                                    .font(.caption2)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.mini)
+                            .disabled(safePage >= totalPages - 1)
+                        }
+
+                        Spacer()
+
+                        Button("Clear") {
+                            recordingManager.historyService.clearHistory()
+                            historyPage = 0
+                        }
+                        .font(.body)
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+
                     ForEach(pageEntries) { entry in
                         Button {
                             NSPasteboard.general.clearContents()
@@ -226,39 +259,6 @@ struct MenuBarView: View {
                         .background(hoveredHistoryId == entry.id ? AnyShapeStyle(.thinMaterial) : AnyShapeStyle(.ultraThinMaterial), in: RoundedRectangle(cornerRadius: 8))
                         .onHover { hovering in hoveredHistoryId = hovering ? entry.id : nil }
                     }
-
-                    // Pagination
-                    if totalPages > 1 {
-                        HStack {
-                            Button {
-                                historyPage = max(0, historyPage - 1)
-                            } label: {
-                                Image(systemName: "chevron.left")
-                                    .font(.caption)
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(safePage == 0)
-
-                            Spacer()
-
-                            Text("\(safePage + 1) / \(totalPages)")
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-
-                            Spacer()
-
-                            Button {
-                                historyPage = min(totalPages - 1, historyPage + 1)
-                            } label: {
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(safePage >= totalPages - 1)
-                        }
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, DesignTokens.Spacing.s)
-                    }
                 }
             }
             .onChange(of: recordingManager.historyService.entries.count) {
@@ -285,6 +285,9 @@ struct MenuBarView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            Text("v\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
+                .font(.caption)
+                .foregroundStyle(.quaternary)
         }
     }
 
