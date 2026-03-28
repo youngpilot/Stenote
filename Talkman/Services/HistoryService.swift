@@ -5,11 +5,13 @@ struct HistoryEntry: Codable, Identifiable {
     let id: UUID
     let timestamp: Date
     let text: String
+    let duration: TimeInterval?
 
-    init(text: String) {
+    init(text: String, duration: TimeInterval? = nil) {
         self.id = UUID()
         self.timestamp = Date()
         self.text = text
+        self.duration = duration
     }
 }
 
@@ -26,11 +28,11 @@ final class HistoryService {
         loadFromDefaults()
     }
 
-    func addEntry(_ text: String) {
+    func addEntry(_ text: String, duration: TimeInterval? = nil) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
-        let entry = HistoryEntry(text: trimmed)
+        let entry = HistoryEntry(text: trimmed, duration: duration)
         entries.insert(entry, at: 0)
 
         // Keep only the last maxEntries

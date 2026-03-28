@@ -24,6 +24,7 @@ final class RecordingManager {
     private(set) var modelLoadError: String?
     private(set) var audioLevel: Float = 0.0
     private(set) var needsAccessibility = false
+    private var recordingStartTime: Date?
 
     var currentText: String { transcriptionService.currentText }
     var isModelLoaded: Bool { transcriptionService.isModelLoaded }
@@ -112,6 +113,7 @@ final class RecordingManager {
                 }
             )
             isRecording = true
+            recordingStartTime = Date()
             needsAccessibility = !AXIsProcessTrusted()
             SoundFeedback.playStart()
 
@@ -163,7 +165,8 @@ final class RecordingManager {
             var historyText = finalText
             if !prefix.isEmpty { historyText = prefix + " " + historyText }
             if !suffix.isEmpty { historyText += " " + suffix }
-            historyService.addEntry(historyText)
+            let duration = recordingStartTime.map { Date().timeIntervalSince($0) }
+            historyService.addEntry(historyText, duration: duration)
         }
 
         // Wait for all pending pastes to complete before ending session.
