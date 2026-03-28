@@ -131,8 +131,8 @@ struct MenuBarView: View {
 
         // Audio level + transcription preview while recording
         if recordingManager.isRecording {
-            // Audio level indicator
-            AudioLevelView(level: recordingManager.audioLevel)
+            // Waveform visualization
+            WaveformView(samples: recordingManager.waveformSamples, isRecording: recordingManager.isRecording)
 
             if !recordingManager.currentText.isEmpty {
                 Button {
@@ -578,7 +578,7 @@ private struct InlineSettingsView: View {
                         .font(labelFont)
                         .foregroundStyle(.tertiary)
                 } else {
-                    Text("Text appears when you stop. Max accuracy.")
+                    Text("Text appears as confirmed. Max accuracy.")
                         .font(labelFont)
                         .foregroundStyle(.tertiary)
                 }
@@ -658,6 +658,36 @@ private struct InlineSettingsView: View {
 
             // Text Output
             SettingsCard(title: "Text Output") {
+                settingsRow("Insertion") {
+                    Picker("", selection: Binding(
+                        get: { settings.insertionMode },
+                        set: { settings.insertionMode = $0 }
+                    )) {
+                        ForEach(InsertionMode.allCases) { mode in
+                            Text(mode.label).tag(mode)
+                        }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                }
+
+                if settings.insertionMode == .direct {
+                    Text("Types characters directly. Works everywhere but slower for long texts.")
+                        .font(labelFont)
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if settings.insertionMode == .clipboard {
+                    Text("Uses clipboard paste. Fastest, but briefly replaces clipboard.")
+                        .font(labelFont)
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Text("Direct typing for short text, clipboard for longer text.")
+                        .font(labelFont)
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
                 Toggle("Number Formatting (ITN)", isOn: Binding(
                     get: { settings.enableITN },
                     set: { settings.enableITN = $0 }
@@ -668,6 +698,19 @@ private struct InlineSettingsView: View {
                     .font(labelFont)
                     .foregroundStyle(.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
+
+                Toggle("Voice Commands", isOn: Binding(
+                    get: { settings.enableVoiceCommands },
+                    set: { settings.enableVoiceCommands = $0 }
+                ))
+                .font(labelFont)
+
+                if settings.enableVoiceCommands {
+                    Text("Say \"period\", \"comma\", \"new line\" etc. to insert punctuation.")
+                        .font(labelFont)
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
                 settingsRow("Prefix") {
                     TextField("", text: Binding(

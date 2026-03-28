@@ -7,7 +7,8 @@ final class AudioCaptureService: @unchecked Sendable {
 
     func startCapture(
         onBuffer: @escaping @Sendable (AVAudioPCMBuffer) -> Void,
-        onLevel: @escaping @Sendable (Float) -> Void
+        onLevel: @escaping @Sendable (Float) -> Void,
+        onSamples: @escaping @Sendable ([Float]) -> Void
     ) throws {
         // Check microphone permission
         let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
@@ -65,6 +66,8 @@ final class AudioCaptureService: @unchecked Sendable {
                         let db = 20 * log10(max(rms, 1e-6))
                         let level = min(max((db + 55) / 40, 0), 1.0) // -55dB floor, -15dB ceiling
                         onLevel(level)
+                        let samples = Array(UnsafeBufferPointer(start: floatData[0], count: count))
+                        onSamples(samples)
                     }
                 }
                 onBuffer(convertedBuffer)

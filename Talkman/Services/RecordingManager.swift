@@ -23,8 +23,10 @@ final class RecordingManager {
     private(set) var isModelLoading = false
     private(set) var modelLoadError: String?
     private(set) var audioLevel: Float = 0.0
+    private(set) var waveformSamples: [Float] = []
     private(set) var needsAccessibility = false
     private var recordingStartTime: Date?
+    private var sampleRingBuffer = RingBuffer<Float>(capacity: 16000 * 3, defaultValue: 0)
 
     var currentText: String { transcriptionService.currentText }
     var isModelLoaded: Bool { transcriptionService.isModelLoaded }
@@ -111,6 +113,13 @@ final class RecordingManager {
                     Task { @MainActor in
                         self?.audioLevel = level
                     }
+                },
+                onSamples: { [weak self] samples in
+                    Task { @MainActor in
+                        guard let self else { return }
+                        self.sampleRingBuffer.append(contentsOf: samples)
+                        self.waveformSamples = self.sampleRingBuffer.toArray()
+                    }
                 }
             )
             isRecording = true
@@ -142,6 +151,8 @@ final class RecordingManager {
         audioCaptureService.stopCapture()
         isRecording = false
         audioLevel = 0.0
+        waveformSamples = []
+        sampleRingBuffer = RingBuffer<Float>(capacity: 16000 * 3, defaultValue: 0)
         if SettingsStore.shared.mediaPlaybackOption != .none {
             systemAudio.resumeAndFadeIn()
         }

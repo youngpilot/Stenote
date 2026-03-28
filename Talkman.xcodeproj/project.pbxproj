@@ -123,6 +123,8 @@
 				A10002000000000000000014 /* TextReplacementService.swift */,
 				A10002000000000000000016 /* HistoryService.swift */,
 				A10002000000000000000017 /* SystemAudioService.swift */,
+				A5178128DCCD441D8396BC03 /* VoiceCommandService.swift */,
+				1EFC8E0F196644678C25C326 /* RingBuffer.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -131,6 +133,7 @@
 			isa = PBXGroup;
 			children = (
 				A10002000000000000000010 /* MenuBarView.swift */,
+				241AD4F7F22E4384AD139523 /* WaveformView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -233,6 +236,9 @@
 				A10001000000000000000015 /* UncheckedSendableBox.swift in Sources */,
 				A10001000000000000000016 /* HistoryService.swift in Sources */,
 				A10001000000000000000017 /* SystemAudioService.swift in Sources */,
+				D5CC79748A1542A3AC4C6717 /* VoiceCommandService.swift in Sources */,
+				204855D3C2B24E5697EDEAFD /* RingBuffer.swift in Sources */,
+				59A7FA083FE74BA3912763C0 /* WaveformView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -17,6 +17,7 @@ final class TranscriptionService {
     private(set) var modelLoadingStep = ""
 
     private let textReplacement = TextReplacementService.shared
+    private let voiceCommands = VoiceCommandService.shared
 
     // Shared FluidAudio components
     private var asrModels: UncheckedSendableBox<AsrModels>?
@@ -39,6 +40,7 @@ final class TranscriptionService {
 
     // --- Accurate mode state ---
     private var lastConfirmedText = ""  // used for volatile preview diff
+    private var lastPastedConfirmedText = ""  // tracks what was already pasted incrementally
     private var updateTask: Task<Void, Never>?
 
     // --- Shared VAD state ---
@@ -330,6 +332,7 @@ final class TranscriptionService {
             }
 
             corrected = removeTrailingStutter(corrected)
+            corrected = voiceCommands.process(corrected)
 
             // Detect language
             let recognizer = NLLanguageRecognizer()
@@ -361,6 +364,7 @@ final class TranscriptionService {
         guard let asrModels else { return }
 
         lastConfirmedText = ""
+        lastPastedConfirmedText = ""
 
         let config = StreamingAsrConfig(
             chunkSeconds: 15.0,              // Default .streaming=11 — larger chunks = more context
@@ -422,6 +426,7 @@ final class TranscriptionService {
                 if !trimmed.isEmpty {
                     var corrected = textReplacement.applyReplacements(to: trimmed)
                     corrected = removeTrailingStutter(corrected)
+                    corrected = voiceCommands.process(corrected)
 
                     let recognizer = NLLanguageRecognizer()
                     recognizer.processString(corrected)
@@ -430,8 +435,23 @@ final class TranscriptionService {
                     }
 
                     currentText = corrected
-                    logger.info("Accurate finish: \(corrected.prefix(80))…")
-                    onSegmentReady?(corrected)
+
+                    // Only paste what wasn't already sent incrementally
+                    let remaining: String
+                    if corrected.hasPrefix(lastPastedConfirmedText) {
+                        remaining = String(corrected.dropFirst(lastPastedConfirmedText.count))
+                            .trimmingCharacters(in: .whitespaces)
+                    } else {
+                        // Text diverged from incremental — paste full result
+                        remaining = corrected
+                    }
+
+                    if !remaining.isEmpty {
+                        logger.info("Accurate finish remaining: \(remaining.prefix(80))…")
+                        onSegmentReady?(remaining)
+                    } else {
+                        logger.info("Accurate finish: all text already pasted incrementally")
+                    }
                 }
             } catch {
                 logger.error("Streaming ASR finish error: \(error)")
@@ -482,18 +502,32 @@ final class TranscriptionService {
         let corrected = textReplacement.applyReplacements(to: rawText)
 
         if update.isConfirmed {
-            // In Accurate mode, paste happens in one batch at finish() — not here.
-            // Just update the UI preview so the user sees text growing during recording.
             lastConfirmedText = corrected
             currentText = corrected
+
+            // Paste incrementally when confident enough
+            if update.confidence >= 0.75,
+               corrected.count > lastPastedConfirmedText.count,
+               corrected.hasPrefix(lastPastedConfirmedText) {
+                var newText = String(corrected.dropFirst(lastPastedConfirmedText.count))
+                    .trimmingCharacters(in: .whitespaces)
+                if !newText.isEmpty {
+                    newText = voiceCommands.process(newText)
+                    newText = removeTrailingStutter(newText)
+                    if !newText.isEmpty {
+                        logger.info("Streaming paste: \(newText.prefix(60))…")
+                        onSegmentReady?(newText + " ")
+                        lastPastedConfirmedText = corrected
+                    }
+                }
+            }
         } else {
             // Volatile — show as preview
             if corrected.hasPrefix(lastConfirmedText) {
                 let preview = String(corrected.dropFirst(lastConfirmedText.count))
                     .trimmingCharacters(in: .whitespaces)
                 if !preview.isEmpty {
-                    let confirmedPart = segments.map(\.text).joined(separator: " ")
-                    currentText = confirmedPart.isEmpty ? preview : confirmedPart + " " + preview
+                    currentText = lastConfirmedText.isEmpty ? preview : lastConfirmedText + " " + preview
                 }
             }
         }
