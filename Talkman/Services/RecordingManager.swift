@@ -17,6 +17,7 @@ final class RecordingManager {
     private let hotkeyService = HotkeyService()
     private let systemAudio = SystemAudioService.shared
     let historyService = HistoryService.shared
+    private let pendingAudioTasks = PendingTaskCounter()
 
     private(set) var isRecording = false
     private(set) var isModelLoading = false
@@ -92,11 +93,14 @@ final class RecordingManager {
     private func beginCapture() {
         guard !isRecording else { return }
 
+        let counter = pendingAudioTasks
         do {
             try audioCaptureService.startCapture(
                 onBuffer: { [weak self] buffer in
                     nonisolated(unsafe) let sendableBuffer = buffer
+                    counter.increment()
                     Task { @MainActor in
+                        defer { counter.decrement() }
                         guard let self else { return }
                         await self.transcriptionService.processAudioBuffer(sendableBuffer)
                     }
@@ -140,9 +144,11 @@ final class RecordingManager {
         }
         SoundFeedback.playStop()
 
-        // Transcribe remaining audio — the onSegmentReady callback wraps in
-        // Task { @MainActor }, so we must yield to let those tasks run before
-        // ending the session.
+        // Drain in-flight audio Tasks before stopping transcription.
+        // stopCapture() prevents new callbacks, but queued MainActor Tasks
+        // may still need to call streamAudio(). Each sleep yields MainActor.
+        await drainPendingAudioTasks()
+
         let finalText = await transcriptionService.stopTranscription()
 
         // Append suffix text if configured
@@ -163,13 +169,29 @@ final class RecordingManager {
         // Wait for all pending pastes to complete before ending session.
         // doPaste uses async DispatchQueue drains (scheduleDrain +20ms, activate +60ms)
         // so isPasting stays true until the full chain completes.
-        for _ in 0..<20 {
+        for i in 0..<30 {
             if !outputService.hasPendingOutput { break }
             outputService.flushPendingText()
             try? await Task.sleep(for: .milliseconds(10))
+            if i == 29 {
+                logger.warning("Paste drain timeout — ending session anyway")
+            }
         }
 
         outputService.endSession()
+    }
+
+    /// Wait for all in-flight audio processing Tasks to complete.
+    /// Each iteration yields MainActor so queued Tasks can execute.
+    private func drainPendingAudioTasks() async {
+        for _ in 0..<40 { // max ~200ms
+            if pendingAudioTasks.count == 0 { break }
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        let remaining = pendingAudioTasks.count
+        if remaining > 0 {
+            logger.warning("Audio drain timeout: \(remaining) tasks still pending")
+        }
     }
 }
 
@@ -183,4 +205,13 @@ enum SoundFeedback {
     static func playStop() {
         NSSound(named: "Bottle")?.play()
     }
+}
+
+/// Thread-safe counter for tracking in-flight audio processing Tasks.
+final class PendingTaskCounter: Sendable {
+    private let _count = OSAllocatedUnfairLock(initialState: 0)
+
+    func increment() { _count.withLock { $0 += 1 } }
+    func decrement() { _count.withLock { $0 -= 1 } }
+    var count: Int { _count.withLock { $0 } }
 }

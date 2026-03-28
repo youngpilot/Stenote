@@ -263,13 +263,19 @@ final class TranscriptionService {
     }
 
     private func stopLiveMode() async {
+        // Wait for any in-flight transcription to complete before transcribing
+        // remaining audio. Without this, resetting isTranscribing_ASR while a
+        // transcription is awaiting allows two concurrent calls → duplicate text.
+        for _ in 0..<100 { // max ~1s
+            if !isTranscribing_ASR { break }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+
         // Flush remaining VAD buffer into accumulated
         if !vadBuffer.isEmpty {
             accumulatedSamples.append(contentsOf: vadBuffer)
             vadBuffer = []
         }
-
-        isTranscribing_ASR = false
 
         // Transcribe ALL remaining audio — never discard
         if !accumulatedSamples.isEmpty {
@@ -307,6 +313,8 @@ final class TranscriptionService {
                 corrected = corrected.trimmingCharacters(in: .whitespaces)
                 guard !corrected.isEmpty else { return }
             }
+
+            corrected = removeTrailingStutter(corrected)
 
             // Detect language
             let recognizer = NLLanguageRecognizer()
@@ -383,17 +391,15 @@ final class TranscriptionService {
         updateTask = nil
 
         if let asr = streamingAsr {
-            // Drain in-flight audio Tasks before finish() closes the input stream.
-            // Audio tap creates Tasks on MainActor that call streamAudio().
-            // Without this yield, finish() calls inputBuilder.finish() synchronously
-            // and pending audio Tasks find the builder already closed → audio lost.
-            try? await Task.sleep(for: .milliseconds(50))
+            // Audio drain is now handled by RecordingManager.drainPendingAudioTasks()
+            // before stopTranscription() is called — no sleep needed here.
 
             do {
                 let finalText = try await asr.finish()
                 let trimmed = finalText.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !trimmed.isEmpty {
-                    let corrected = textReplacement.applyReplacements(to: trimmed)
+                    var corrected = textReplacement.applyReplacements(to: trimmed)
+                    corrected = removeTrailingStutter(corrected)
 
                     let recognizer = NLLanguageRecognizer()
                     recognizer.processString(corrected)
@@ -402,8 +408,7 @@ final class TranscriptionService {
                     }
 
                     currentText = corrected
-                    // Paste the full finish() text in one shot — no comparison needed.
-                    // Streaming confirmed updates only update the UI; paste is deferred to here.
+                    logger.info("Accurate finish: \(corrected.prefix(80))…")
                     onSegmentReady?(corrected)
                 }
             } catch {
@@ -412,6 +417,38 @@ final class TranscriptionService {
         }
 
         streamingAsr = nil
+    }
+
+    /// Detect and remove ASR stutter where the last 1-2 words are repeated.
+    /// e.g. "hello world world" → "hello world"
+    private func removeTrailingStutter(_ text: String) -> String {
+        let words = text.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+
+        func normalize(_ word: String) -> String {
+            word.lowercased().filter { !$0.isPunctuation }
+        }
+
+        // Check 2-word stutter first: "... w1 w2 w1 w2"
+        if words.count >= 4 {
+            let tail = words.suffix(2).map { normalize($0) }
+            let before = words.dropLast(2).suffix(2).map { normalize($0) }
+            if tail == before && tail.allSatisfy({ !$0.isEmpty }) {
+                logger.info("Stutter removed (2-word): '\(words.suffix(2).joined(separator: " "))'")
+                return words.dropLast(2).joined(separator: " ")
+            }
+        }
+
+        // Check 1-word stutter: "... w w" (min 3 chars to avoid false positives like "I I")
+        if words.count >= 2 {
+            let last = normalize(words[words.count - 1])
+            let prev = normalize(words[words.count - 2])
+            if last == prev && last.count >= 3 {
+                logger.info("Stutter removed (1-word): '\(words.last!)'")
+                return words.dropLast().joined(separator: " ")
+            }
+        }
+
+        return text
     }
 
     private func handleStreamingUpdate(_ update: StreamingTranscriptionUpdate) {

@@ -1,6 +1,9 @@
 import AppKit
 import ApplicationServices
 import Observation
+import os
+
+private let logger = Logger(subsystem: "com.youngpilot.Talkman", category: "Output")
 
 @Observable
 @MainActor
@@ -68,8 +71,9 @@ final class OutputService {
         isSessionActive = false
         targetLocked = false
         sourceApp = nil
-        // Delay restore so the last Cmd+V has time to read the clipboard
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+        logger.info("Session ended — restoring clipboard in 750ms")
+        // Delay restore so the last Cmd+V has time to be read by the target app
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.75) { [weak self] in
             self?.restorePasteboard()
         }
     }
@@ -78,12 +82,14 @@ final class OutputService {
         guard !text.isEmpty else { return }
 
         guard let sourceApp else {
+            logger.warning("insertText but no sourceApp — buffering \(text.count) chars")
             pendingText += text
             return
         }
 
         targetLocked = true
         pendingText += text
+        logger.info("insertText: \(text.prefix(60))… (pending: \(self.pendingText.count) chars)")
 
         guard !isPasting else { return }
 
