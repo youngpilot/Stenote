@@ -389,7 +389,6 @@ struct MenuBarView: View {
                 if let duration = entry.duration {
                     Text(formatDuration(duration))
                         .fontWeight(.medium)
-                        .foregroundStyle(durationColor(duration))
                 }
                 Text("·").foregroundStyle(.quaternary)
                 Text(roughTimestamp(entry.timestamp))
@@ -499,7 +498,7 @@ struct MenuBarView: View {
     private func formatDuration(_ duration: TimeInterval) -> String {
         let seconds = Int(duration)
         if seconds < 60 {
-            return "0:\(String(format: "%02d", seconds))m"
+            return "\(seconds)s"
         }
         if seconds < 3600 {
             return "\(seconds / 60):\(String(format: "%02d", seconds % 60))m"
