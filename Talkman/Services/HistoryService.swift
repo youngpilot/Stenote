@@ -15,6 +15,10 @@ struct HistoryEntry: Codable, Identifiable {
         self.duration = duration
         self.recordingId = recordingId
     }
+
+    var formattedId: String {
+        String(format: "%05d", recordingId ?? 0)
+    }
 }
 
 @Observable
@@ -57,6 +61,11 @@ final class HistoryService {
         ud.set(totalDuration, forKey: "totalDuration")
         ud.set(totalCharacters, forKey: "totalCharacters")
 
+        saveToDefaults()
+    }
+
+    func deleteEntry(_ id: UUID) {
+        entries.removeAll { $0.id == id }
         saveToDefaults()
     }
 

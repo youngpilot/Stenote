@@ -177,6 +177,14 @@ final class SettingsStore {
         didSet { UserDefaults.standard.set(enableVoiceCommands, forKey: "enableVoiceCommands") }
     }
 
+    var historyPreviewLines: Int {
+        didSet { UserDefaults.standard.set(historyPreviewLines, forKey: "historyPreviewLines") }
+    }
+
+    var exportDirectory: String {
+        didSet { UserDefaults.standard.set(exportDirectory, forKey: "exportDirectory") }
+    }
+
     var onHotkeyChanged: ((Set<HotkeyChoice>) -> Void)?
 
     func resetToDefaults() {
@@ -192,6 +200,8 @@ final class SettingsStore {
         transcriptionMode = .accurate
         insertionMode = .auto
         enableVoiceCommands = false
+        historyPreviewLines = 3
+        exportDirectory = SettingsStore.defaultDownloadsPath
     }
 
     private init() {
@@ -219,5 +229,11 @@ final class SettingsStore {
         self.transcriptionMode = TranscriptionMode(rawValue: ud.string(forKey: "transcriptionMode") ?? "") ?? .accurate
         self.insertionMode = InsertionMode(rawValue: ud.string(forKey: "insertionMode") ?? "") ?? .auto
         self.enableVoiceCommands = ud.bool(forKey: "enableVoiceCommands")
+        self.historyPreviewLines = ud.object(forKey: "historyPreviewLines") == nil ? 3 : ud.integer(forKey: "historyPreviewLines")
+        self.exportDirectory = ud.string(forKey: "exportDirectory") ?? SettingsStore.defaultDownloadsPath
     }
+
+    static let defaultDownloadsPath: String = {
+        FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first?.path ?? "~/Downloads"
+    }()
 }

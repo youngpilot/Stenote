@@ -7,11 +7,13 @@ struct MenuBarView: View {
     @State private var copiedFeedback = false
     @State private var showSettings = false
     @State private var copiedHistoryId: UUID?
+    @State private var savedHistoryId: UUID?
     @State private var hoveredHistoryId: UUID?
     @State private var expandedHistoryId: UUID?
     @State private var showResetConfirm = false
     @State private var historyPage = 0
     @State private var hoveringRecordings = false
+    @State private var showClearConfirm = false
 
     var body: some View {
         VStack(spacing: DesignTokens.Spacing.m) {
@@ -50,7 +52,7 @@ struct MenuBarView: View {
                 }
             } label: {
                 Image(systemName: "gearshape.fill")
-                    .frame(width: 16)
+                    .frame(width: 16, height: 16)
             }
             .keyboardShortcut(",", modifiers: .command)
             .buttonStyle(.bordered)
@@ -60,7 +62,8 @@ struct MenuBarView: View {
                 NSApplication.shared.terminate(nil)
             } label: {
                 Image(systemName: "xmark")
-                    .frame(width: 16)
+                    .fontWeight(.medium)
+                    .frame(width: 16, height: 16)
             }
             .keyboardShortcut("q", modifiers: .command)
             .buttonStyle(.bordered)
@@ -188,17 +191,11 @@ struct MenuBarView: View {
             if !recordingManager.isRecording, !recordingManager.isModelLoading {
                 let h = recordingManager.historyService
                 if h.totalRecordings > 0 {
-                    Text("\(h.totalRecordings) rec · \(formatDuration(h.totalDuration)) · \(formatCharCount(h.totalCharacters)) chars")
-                        .font(.caption)
-                        .foregroundStyle(.quaternary)
-                    Text("·")
+                    Text("\(formatDuration(h.totalDuration)) · \(formatCharCount(h.totalCharacters)) chars")
                         .font(.caption)
                         .foregroundStyle(.quaternary)
                 }
             }
-            Text("v\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
-                .font(.caption)
-                .foregroundStyle(.quaternary)
         }
     }
 
@@ -355,91 +352,149 @@ struct MenuBarView: View {
 
             Spacer()
 
-            Button("Clear") {
-                recordingManager.historyService.clearHistory()
-                historyPage = 0
+            if showClearConfirm {
+                Button("Confirm") {
+                    recordingManager.historyService.clearHistory()
+                    historyPage = 0
+                    showClearConfirm = false
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+                .tint(.red)
+            } else {
+                Button("Clear") {
+                    showClearConfirm = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                        showClearConfirm = false
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
             }
-            .buttonStyle(.bordered)
-            .controlSize(.regular)
         }
     }
 
     @ViewBuilder
     private func historyRow(_ entry: HistoryEntry) -> some View {
-        let isExpanded = expandedHistoryId == entry.id
-        HStack(alignment: .top, spacing: 6) {
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    if let rid = entry.recordingId {
-                        Text("#\(rid)")
-                            .fontWeight(.medium)
-                            .foregroundStyle(.secondary)
-                    }
-                    if entry.recordingId != nil, entry.duration != nil {
-                        Text("·").foregroundStyle(.quaternary)
-                    }
-                    if let duration = entry.duration {
-                        Text(formatDuration(duration))
-                            .fontWeight(.medium)
-                            .foregroundStyle(durationColor(duration))
-                    }
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 6) {
+                if let rid = entry.recordingId {
+                    Text("#\(rid)")
+                        .fontWeight(.medium)
+                        .foregroundStyle(.secondary)
+                }
+                if entry.recordingId != nil, entry.duration != nil {
                     Text("·").foregroundStyle(.quaternary)
-                    Text(roughTimestamp(entry.timestamp))
-                    Text("·").foregroundStyle(.quaternary)
-                    Text("\(entry.text.count) chars")
                 }
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-
-                Text(entry.text)
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                    .lineLimit(isExpanded ? 7 : 3)
-                    .truncationMode(.tail)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .contentShape(Rectangle())
-            .onTapGesture {
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    expandedHistoryId = isExpanded ? nil : entry.id
+                if let duration = entry.duration {
+                    Text(formatDuration(duration))
+                        .fontWeight(.medium)
+                        .foregroundStyle(durationColor(duration))
                 }
+                Text("·").foregroundStyle(.quaternary)
+                Text(roughTimestamp(entry.timestamp))
+                Text("·").foregroundStyle(.quaternary)
+                Text("\(entry.text.count) chars")
             }
+            .font(.caption)
+            .foregroundStyle(.tertiary)
 
-            VStack {
-                Button {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(entry.text, forType: .string)
-                    copiedHistoryId = entry.id
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                        if copiedHistoryId == entry.id {
-                            copiedHistoryId = nil
-                        }
-                    }
-                } label: {
-                    Image(systemName: copiedHistoryId == entry.id ? "checkmark" : "doc.on.doc")
-                        .font(.caption)
-                        .foregroundStyle(copiedHistoryId == entry.id ? AnyShapeStyle(.green) : AnyShapeStyle(.tertiary))
-                        .frame(width: 24, height: 24)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-
-                Spacer()
-
-                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                    .font(.caption2)
-                    .fontWeight(.bold)
-                    .foregroundStyle(.secondary)
-                    .opacity(hoveredHistoryId == entry.id ? 1 : 0)
-            }
+            Text(entry.text)
+                .font(.body)
+                .foregroundStyle(.primary)
+                .lineLimit(SettingsStore.shared.historyPreviewLines)
+                .truncationMode(.tail)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(DesignTokens.Spacing.s)
         .background(hoveredHistoryId == entry.id ? AnyShapeStyle(.thinMaterial) : AnyShapeStyle(.ultraThinMaterial), in: RoundedRectangle(cornerRadius: 8))
+        .overlay {
+            let isActive = copiedHistoryId == entry.id || savedHistoryId == entry.id
+            RoundedRectangle(cornerRadius: 8)
+                .fill(.green.opacity(isActive ? 0.15 : 0))
+                .overlay {
+                    Text(savedHistoryId == entry.id ? "Saved" : "Copied")
+                        .font(.body)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.green)
+                        .opacity(isActive ? 1 : 0)
+                }
+                .animation(.easeIn(duration: 0.1), value: isActive)
+                .animation(.easeOut(duration: 0.6).delay(0.8), value: !isActive)
+                .allowsHitTesting(false)
+        }
         .onHover { hovering in hoveredHistoryId = hovering ? entry.id : nil }
+        .contextMenu {
+            Button {
+                copyEntry(entry)
+            } label: {
+                Label("Copy", systemImage: "doc.on.doc")
+            }
+            Button {
+                saveEntryAsTxt(entry)
+            } label: {
+                Label("Save as .txt", systemImage: "square.and.arrow.down")
+            }
+            Divider()
+            Button(role: .destructive) {
+                recordingManager.historyService.deleteEntry(entry.id)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
     }
 
     // MARK: - Helpers
+
+    private func saveEntryAsTxt(_ entry: HistoryEntry) {
+        let dir = SettingsStore.shared.exportDirectory
+        let filename = "Talkman_\(entry.formattedId)_\(formatDurationFilename(entry.duration)).txt"
+        let url = URL(fileURLWithPath: dir).appendingPathComponent(filename)
+
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+
+        var content = "Talkman Recording #\(entry.formattedId)\n"
+        content += "Date: \(dateFormatter.string(from: entry.timestamp))\n"
+        if let duration = entry.duration {
+            content += "Duration: \(formatDuration(duration))\n"
+        }
+        content += "Characters: \(entry.text.count)\n"
+        content += "\n---\n\n"
+        content += entry.text
+
+        do {
+            try content.write(to: url, atomically: true, encoding: .utf8)
+            savedHistoryId = entry.id
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                if savedHistoryId == entry.id {
+                    savedHistoryId = nil
+                }
+            }
+        } catch {
+            // Silently fail
+        }
+    }
+
+    private func formatDurationFilename(_ duration: TimeInterval?) -> String {
+        guard let duration else { return "0s" }
+        let seconds = Int(duration)
+        if seconds < 60 { return "\(seconds)s" }
+        if seconds < 3600 { return "\(seconds / 60)m\(String(format: "%02d", seconds % 60))s" }
+        return "\(seconds / 3600)h\(String(format: "%02d", (seconds % 3600) / 60))m"
+    }
+
+    private func copyEntry(_ entry: HistoryEntry) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(entry.text, forType: .string)
+        copiedHistoryId = entry.id
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            if copiedHistoryId == entry.id {
+                copiedHistoryId = nil
+            }
+        }
+    }
 
     private func formatDuration(_ duration: TimeInterval) -> String {
         let seconds = Int(duration)
@@ -552,17 +607,32 @@ private struct AudioLevelView: View {
 
 private struct SettingsCard<Content: View>: View {
     var title: String? = nil
+    var isExpanded: Bool = true
+    var onToggle: (() -> Void)? = nil
     @ViewBuilder var content: () -> Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DesignTokens.Spacing.s) {
+        VStack(alignment: .leading, spacing: isExpanded ? DesignTokens.Spacing.s : 0) {
             if let title {
-                Text(title)
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .fontWeight(.medium)
+                HStack {
+                    Text(title)
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .fontWeight(.medium)
+                    Spacer()
+                    if onToggle != nil {
+                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                            .font(.caption2)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .contentShape(Rectangle())
+                .onTapGesture { onToggle?() }
             }
-            content()
+            if isExpanded {
+                content()
+            }
         }
         .padding(DesignTokens.Spacing.s)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -580,13 +650,14 @@ private struct InlineSettingsView: View {
     @State private var newTo = ""
     @State private var showFnKeyHint = false
     @State private var showShortcutPicker = false
+    @State private var expandedSection: String? = "General"
 
     private let labelFont = Font.body
 
     var body: some View {
         VStack(spacing: DesignTokens.Spacing.s) {
             // General
-            SettingsCard {
+            SettingsCard(title: "General", isExpanded: expandedSection == "General", onToggle: { toggleSection("General") }) {
                 Toggle("Launch at Login", isOn: Binding(
                     get: { settings.launchAtLogin },
                     set: { settings.launchAtLogin = $0 }
@@ -642,10 +713,47 @@ private struct InlineSettingsView: View {
                     .padding(12)
                     .frame(minWidth: 220)
                 }
+
+                settingsRow("History preview") {
+                    Picker("", selection: Binding(
+                        get: { settings.historyPreviewLines },
+                        set: { settings.historyPreviewLines = $0 }
+                    )) {
+                        ForEach(1...9, id: \.self) { n in
+                            Text("\(n) lines").tag(n)
+                        }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                }
+
+                HStack {
+                    Text("Export folder")
+                        .font(labelFont)
+                    Spacer()
+                    Button {
+                        let panel = NSOpenPanel()
+                        panel.canChooseFiles = false
+                        panel.canChooseDirectories = true
+                        panel.allowsMultipleSelection = false
+                        panel.directoryURL = URL(fileURLWithPath: settings.exportDirectory)
+                        if panel.runModal() == .OK, let url = panel.url {
+                            settings.exportDirectory = url.path
+                        }
+                    } label: {
+                        Text(URL(fileURLWithPath: settings.exportDirectory).lastPathComponent)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Image(systemName: "folder")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+                }
             }
 
             // Recording
-            SettingsCard(title: "Recording") {
+            SettingsCard(title: "Recording", isExpanded: expandedSection == "Recording", onToggle: { toggleSection("Recording") }) {
                 settingsRow("Mode") {
                     Picker("", selection: Binding(
                         get: { settings.transcriptionMode },
@@ -747,7 +855,7 @@ private struct InlineSettingsView: View {
             }
 
             // Text Output
-            SettingsCard(title: "Text Output") {
+            SettingsCard(title: "Text Output", isExpanded: expandedSection == "Text Output", onToggle: { toggleSection("Text Output") }) {
                 settingsRow("Insertion") {
                     Picker("", selection: Binding(
                         get: { settings.insertionMode },
@@ -820,7 +928,7 @@ private struct InlineSettingsView: View {
             }
 
             // Word Corrections
-            SettingsCard(title: "Word Corrections") {
+            SettingsCard(title: "Word Corrections", isExpanded: expandedSection == "Word Corrections", onToggle: { toggleSection("Word Corrections") }) {
                 Text("Wrong → Right corrections always work. Boost-only words (no \"Wrong\") need Model Boosting enabled.")
                     .font(labelFont)
                     .foregroundStyle(.tertiary)
@@ -861,7 +969,22 @@ private struct InlineSettingsView: View {
             }
 
             // Word list — outside SettingsCard so @Observable triggers correctly
-            wordListSection
+            if expandedSection == "Word Corrections" {
+                wordListSection
+            }
+
+            HStack {
+                Spacer()
+                Text("v\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
+                    .font(.caption)
+                    .foregroundStyle(.quaternary)
+            }
+        }
+    }
+
+    private func toggleSection(_ section: String) {
+        withAnimation(.easeInOut(duration: 0.15)) {
+            expandedSection = expandedSection == section ? nil : section
         }
     }
 
