@@ -169,6 +169,14 @@ final class SettingsStore {
         didSet { UserDefaults.standard.set(transcriptionMode.rawValue, forKey: "transcriptionMode") }
     }
 
+    var insertionMode: InsertionMode {
+        didSet { UserDefaults.standard.set(insertionMode.rawValue, forKey: "insertionMode") }
+    }
+
+    var enableVoiceCommands: Bool {
+        didSet { UserDefaults.standard.set(enableVoiceCommands, forKey: "enableVoiceCommands") }
+    }
+
     var onHotkeyChanged: ((Set<HotkeyChoice>) -> Void)?
 
     func resetToDefaults() {
@@ -182,6 +190,8 @@ final class SettingsStore {
         mediaPlaybackOption = .none
         enableVocabBoosting = false
         transcriptionMode = .accurate
+        insertionMode = .auto
+        enableVoiceCommands = false
     }
 
     private init() {
@@ -207,5 +217,7 @@ final class SettingsStore {
         self.mediaPlaybackOption = MediaPlaybackOption(rawValue: ud.string(forKey: "mediaPlaybackOption") ?? "") ?? .none
         self.enableVocabBoosting = ud.object(forKey: "enableVocabBoosting") == nil ? false : ud.bool(forKey: "enableVocabBoosting")
         self.transcriptionMode = TranscriptionMode(rawValue: ud.string(forKey: "transcriptionMode") ?? "") ?? .accurate
+        self.insertionMode = InsertionMode(rawValue: ud.string(forKey: "insertionMode") ?? "") ?? .auto
+        self.enableVoiceCommands = ud.bool(forKey: "enableVoiceCommands")
     }
 }

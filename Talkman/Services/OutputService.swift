@@ -5,6 +5,22 @@ import os
 
 private let logger = Logger(subsystem: "com.youngpilot.Talkman", category: "Output")
 
+enum InsertionMode: String, CaseIterable, Identifiable {
+    case auto
+    case clipboard
+    case direct
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .auto: "Auto"
+        case .clipboard: "Clipboard"
+        case .direct: "Direct Typing"
+        }
+    }
+}
+
 @Observable
 @MainActor
 final class OutputService {
@@ -112,6 +128,35 @@ final class OutputService {
         let textToSend = pendingText
         pendingText = ""
 
+        let mode = SettingsStore.shared.insertionMode
+        let useDirectTyping: Bool
+        switch mode {
+        case .direct:
+            useDirectTyping = true
+        case .auto:
+            useDirectTyping = textToSend.count <= 80
+        case .clipboard:
+            useDirectTyping = false
+        }
+
+        if useDirectTyping {
+            logger.info("Direct typing: \(textToSend.count) chars")
+
+            // Only activate if not already frontmost
+            let isFrontmost = NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier
+            if !isFrontmost {
+                app.activate()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) { [weak self] in
+                    self?.typeTextDirectly(textToSend)
+                    self?.scheduleDrain(to: app)
+                }
+            } else {
+                typeTextDirectly(textToSend)
+                scheduleDrain(to: app)
+            }
+            return
+        }
+
         let pasteboard = NSPasteboard.general
 
         // Save clipboard once per session (just the string — fast)
@@ -173,6 +218,24 @@ final class OutputService {
     func flushPendingText() {
         guard !pendingText.isEmpty, let sourceApp, !isPasting else { return }
         doPaste(to: sourceApp)
+    }
+
+    private func typeTextDirectly(_ text: String) {
+        guard AXIsProcessTrusted() else {
+            promptAccessibility()
+            return
+        }
+
+        let source = CGEventSource(stateID: .hidSystemState)
+        for scalar in text.unicodeScalars {
+            var char = UniChar(scalar.value)
+            let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true)
+            let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false)
+            keyDown?.keyboardSetUnicodeString(stringLength: 1, unicodeString: &char)
+            keyUp?.keyboardSetUnicodeString(stringLength: 1, unicodeString: &char)
+            keyDown?.post(tap: .cgAnnotatedSessionEventTap)
+            keyUp?.post(tap: .cgAnnotatedSessionEventTap)
+        }
     }
 
     private func simulatePaste() {

@@ -30,6 +30,7 @@ final class RecordingManager {
     var isModelLoaded: Bool { transcriptionService.isModelLoaded }
     var modelLoadingStep: String { transcriptionService.modelLoadingStep }
     var detectedLanguage: String { transcriptionService.detectedLanguage }
+    var lastConfidence: Float { transcriptionService.lastConfidence }
 
     private init() {
         hotkeyService.onToggle = { [weak self] in

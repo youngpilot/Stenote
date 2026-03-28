@@ -23,6 +23,9 @@
 		A10001000000000000000015 /* UncheckedSendableBox.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000015 /* UncheckedSendableBox.swift */; };
 		A10001000000000000000016 /* HistoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000016 /* HistoryService.swift */; };
 		A10001000000000000000017 /* SystemAudioService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000017 /* SystemAudioService.swift */; };
+		D5CC79748A1542A3AC4C6717 /* VoiceCommandService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5178128DCCD441D8396BC03 /* VoiceCommandService.swift */; };
+		204855D3C2B24E5697EDEAFD /* RingBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EFC8E0F196644678C25C326 /* RingBuffer.swift */; };
+		59A7FA083FE74BA3912763C0 /* WaveformView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 241AD4F7F22E4384AD139523 /* WaveformView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -44,6 +47,9 @@
 		A10002000000000000000017 /* SystemAudioService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioService.swift; sourceTree = "<group>"; };
 		A10002000000000000000018 /* Talkman.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Talkman.entitlements; sourceTree = "<group>"; };
 		A10003000000000000000001 /* Talkman.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Talkman.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A5178128DCCD441D8396BC03 /* VoiceCommandService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCommandService.swift; sourceTree = "<group>"; };
+		1EFC8E0F196644678C25C326 /* RingBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RingBuffer.swift; sourceTree = "<group>"; };
+		241AD4F7F22E4384AD139523 /* WaveformView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaveformView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -230,7 +236,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-/* End PBXSourcesBuildPhase section */
+
 
 /* Begin XCBuildConfiguration section */
 		A10008000000000000000010 /* Debug */ = {
@@ -440,3 +446,4 @@
 	};
 	rootObject = A10009000000000000000001 /* Project object */;
 }
+/* End PBXSourcesBuildPhase section */

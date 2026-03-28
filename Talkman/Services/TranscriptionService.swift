@@ -50,6 +50,9 @@ final class TranscriptionService {
 
     // Language detection
     private(set) var detectedLanguage = ""
+    // Confidence tracking
+    private(set) var lastConfidence: Float = 0
+    private(set) var lastRtfx: Float = 0
 
     var onSegmentReady: ((String) -> Void)?
     var onSilenceTimeout: (() -> Void)?
@@ -61,9 +64,15 @@ final class TranscriptionService {
         let models = try await AsrModels.downloadAndLoad(version: .v3)
         asrModels = UncheckedSendableBox(models)
 
-        // Initialize batch ASR manager (used in Live mode)
+        // Initialize batch ASR manager with tuned TDT config (used in Live mode)
         modelLoadingStep = "Initializing ASR engine… (2/3)"
-        let manager = AsrManager(config: .default)
+        let tdtConfig = TdtConfig(
+            boundarySearchFrames: 30,    // Default 20 — more search at chunk edges
+            maxTokensPerChunk: 200,      // Default 150 — allow longer chunks
+            consecutiveBlankLimit: 8     // Default 5 — less aggressive termination
+        )
+        let asrConfig = ASRConfig(tdtConfig: tdtConfig)
+        let manager = AsrManager(config: asrConfig)
         try await manager.initialize(models: models)
         asrBox = UncheckedSendableBox(manager)
 
@@ -208,7 +217,11 @@ final class TranscriptionService {
 
             do {
                 let vadConfig = VadSegmentationConfig(
-                    minSilenceDuration: SettingsStore.shared.vadSensitivity.minSilenceDuration
+                    minSpeechDuration: 0.25,         // Default 0.15 — filter click noises
+                    minSilenceDuration: SettingsStore.shared.vadSensitivity.minSilenceDuration,
+                    speechPadding: 0.15,             // Default 0.1 — prevent clipped word edges
+                    silenceThresholdForSplit: 0.25,  // Default 0.3 — more sensitive to true silence
+                    negativeThresholdOffset: 0.12    // Default 0.15 — faster speech-end detection
                 )
                 let result = try await vadManager.processStreamingChunk(
                     chunk,
@@ -300,6 +313,8 @@ final class TranscriptionService {
 
         do {
             let result = try await asrBox.value.transcribe(samplesToTranscribe, source: .microphone)
+            lastConfidence = result.confidence
+            lastRtfx = result.rtfx
             let rawText = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !rawText.isEmpty else { return }
 
@@ -347,7 +362,14 @@ final class TranscriptionService {
 
         lastConfirmedText = ""
 
-        let config = StreamingAsrConfig.streaming
+        let config = StreamingAsrConfig(
+            chunkSeconds: 15.0,              // Default .streaming=11 — larger chunks = more context
+            hypothesisChunkSeconds: 1.5,     // Default .streaming=1 — slightly larger hypothesis window
+            leftContextSeconds: 3.0,         // Default .streaming=2 — more left context for word boundaries
+            rightContextSeconds: 3.0,        // Default .streaming=2 — more right context
+            minContextForConfirmation: 8.0,  // Default .streaming=10 — confirm sooner
+            confirmationThreshold: 0.82      // Default .streaming=0.80 — slightly stricter
+        )
         let asr = StreamingAsrManager(config: config)
 
         // Configure vocabulary boosting on streaming manager
@@ -454,6 +476,8 @@ final class TranscriptionService {
     private func handleStreamingUpdate(_ update: StreamingTranscriptionUpdate) {
         let rawText = update.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !rawText.isEmpty else { return }
+
+        lastConfidence = update.confidence
 
         let corrected = textReplacement.applyReplacements(to: rawText)
 
