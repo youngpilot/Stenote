@@ -17,6 +17,9 @@ Packages/
 # Archive
 archive/
 
+# IME build output
+.build-ime/
+
 # Claude operational files
 tasks/
 CLAUDE.md
