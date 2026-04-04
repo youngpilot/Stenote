@@ -55,6 +55,11 @@ final class TranscriptionService {
     // Confidence tracking
     private(set) var lastConfidence: Float = 0
     private(set) var lastRtfx: Float = 0
+    private(set) var minTokenConfidence: Float = 0
+    private(set) var avgTokenConfidence: Float = 0
+
+    // Streaming paste tracking
+    private var lastPastedConfirmedText = ""
 
     var onSegmentReady: ((String) -> Void)?
     var onSilenceTimeout: (() -> Void)?
@@ -364,9 +369,21 @@ final class TranscriptionService {
         guard let asrModels else { return }
 
         lastConfirmedText = ""
+        lastPastedConfirmedText = ""
         isStopping = false
+        minTokenConfidence = 0
+        avgTokenConfidence = 0
 
-        let asr = StreamingAsrManager(config: .streaming)
+        // Tuned config: faster confirmations, more context, lower latency
+        let config = StreamingAsrConfig(
+            chunkSeconds: 11.0,              // Keep — good tradeoff for TDT batch model
+            hypothesisChunkSeconds: 0.5,     // ↓ from 1.0 — faster preview updates
+            leftContextSeconds: 3.0,         // ↑ from 2.0 — better accuracy at chunk edges
+            rightContextSeconds: 1.5,        // ↓ from 2.0 — 0.5s less latency
+            minContextForConfirmation: 5.0,  // ↓ from 10.0 — confirm text 5s earlier
+            confirmationThreshold: 0.85      // ↑ from 0.80 — stricter to compensate
+        )
+        let asr = StreamingAsrManager(config: config)
 
         // Configure vocabulary boosting on streaming manager
         if SettingsStore.shared.enableVocabBoosting, let ctcModels {
@@ -428,8 +445,15 @@ final class TranscriptionService {
                     }
 
                     currentText = corrected
-                    logger.info("Accurate finish (\(corrected.count) chars): \(corrected.prefix(120))…")
-                    onSegmentReady?(corrected)
+
+                    // Only paste the delta not yet pasted during streaming
+                    let delta = computeConfirmedDelta(old: lastPastedConfirmedText, new: corrected)
+                    logger.info("Accurate finish (\(corrected.count) chars, delta: \(delta.count)): \(corrected.prefix(120))…")
+                    if !delta.isEmpty {
+                        let prefix = pendingParagraphBreak ? "\n\n" : ""
+                        pendingParagraphBreak = false
+                        onSegmentReady?(prefix + delta)
+                    }
                 } else {
                     logger.warning("finish() returned empty text!")
                 }
@@ -480,12 +504,31 @@ final class TranscriptionService {
 
         lastConfidence = update.confidence
 
+        // Per-token confidence from TokenTiming
+        let timings = update.tokenTimings
+        if !timings.isEmpty {
+            let confidences = timings.map(\.confidence)
+            minTokenConfidence = confidences.min() ?? 0
+            avgTokenConfidence = confidences.reduce(0, +) / Float(confidences.count)
+        }
+
         let corrected = textReplacement.applyReplacements(to: rawText)
 
         if update.isConfirmed {
             lastConfirmedText = corrected
             currentText = corrected
-            logger.info("Confirmed (\(corrected.count) chars): \(corrected.prefix(60))…")
+            logger.info("Confirmed (\(corrected.count) chars, avg:\(String(format: "%.0f", self.avgTokenConfidence * 100))%): \(corrected.prefix(60))…")
+
+            // Incremental paste: only paste the delta since last paste
+            if corrected.count > lastPastedConfirmedText.count {
+                let delta = computeConfirmedDelta(old: lastPastedConfirmedText, new: corrected)
+                if !delta.isEmpty {
+                    let prefix = pendingParagraphBreak ? "\n\n" : ""
+                    pendingParagraphBreak = false
+                    onSegmentReady?(prefix + delta + " ")
+                    lastPastedConfirmedText = corrected
+                }
+            }
         } else {
             // Volatile — show as preview
             if corrected.hasPrefix(lastConfirmedText) {
@@ -496,5 +539,29 @@ final class TranscriptionService {
                 }
             }
         }
+    }
+
+    /// Word-level delta between old and new confirmed text.
+    /// Robust against re-punctuation ("world" → "world,").
+    private func computeConfirmedDelta(old: String, new: String) -> String {
+        guard !old.isEmpty else { return new }
+        let oldWords = old.split(separator: " ", omittingEmptySubsequences: true)
+        let newWords = new.split(separator: " ", omittingEmptySubsequences: true)
+
+        func normalize(_ word: Substring) -> String {
+            word.lowercased().filter { !$0.isPunctuation }
+        }
+
+        var matchCount = 0
+        for (o, n) in zip(oldWords, newWords) {
+            if normalize(o) == normalize(n) {
+                matchCount += 1
+            } else {
+                break
+            }
+        }
+
+        let remaining = newWords[matchCount...]
+        return remaining.joined(separator: " ")
     }
 }

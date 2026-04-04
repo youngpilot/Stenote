@@ -187,6 +187,13 @@ struct MenuBarView: View {
                     .fontWeight(.medium)
                     .foregroundStyle(.secondary)
             }
+            if recordingManager.isRecording, recordingManager.avgTokenConfidence > 0 {
+                Text("·")
+                    .foregroundStyle(.tertiary)
+                Text("\(Int(recordingManager.avgTokenConfidence * 100))%")
+                    .font(.body)
+                    .foregroundStyle(recordingManager.minTokenConfidence < 0.5 ? .orange : .secondary)
+            }
             Spacer()
             if !recordingManager.isRecording, !recordingManager.isModelLoading {
                 let h = recordingManager.historyService
