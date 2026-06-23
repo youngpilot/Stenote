@@ -2,30 +2,6 @@ import ServiceManagement
 import SwiftUI
 import Observation
 
-enum VadSensitivity: String, CaseIterable, Identifiable {
-    case quick = "quick"
-    case normal = "normal"
-    case patient = "patient"
-
-    var id: String { rawValue }
-
-    var label: String {
-        switch self {
-        case .quick: "Quick (0.4s)"
-        case .normal: "Normal (0.75s)"
-        case .patient: "Patient (1.5s)"
-        }
-    }
-
-    var minSilenceDuration: TimeInterval {
-        switch self {
-        case .quick: 0.4
-        case .normal: 0.75
-        case .patient: 1.5
-        }
-    }
-}
-
 enum AutoStopOption: Int, CaseIterable, Identifiable {
     case ten = 10
     case twenty = 20
@@ -158,10 +134,6 @@ final class SettingsStore {
         didSet { UserDefaults.standard.set(prefixText, forKey: "prefixText") }
     }
 
-    var vadSensitivity: VadSensitivity {
-        didSet { UserDefaults.standard.set(vadSensitivity.rawValue, forKey: "vadSensitivity") }
-    }
-
     var autoStopTimeout: AutoStopOption {
         didSet { UserDefaults.standard.set(autoStopTimeout.rawValue, forKey: "autoStopTimeout") }
     }
@@ -212,7 +184,6 @@ final class SettingsStore {
         politenessMode = false
         prefixText = ""
         suffixText = ""
-        vadSensitivity = .normal
         autoStopTimeout = .thirty
         silenceMediaWhileRecording = true
         pauseMediaApps = true
@@ -239,7 +210,6 @@ final class SettingsStore {
         self.politenessMode = ud.bool(forKey: "politenessMode")
         self.suffixText = ud.string(forKey: "suffixText") ?? ""
         self.prefixText = ud.string(forKey: "prefixText") ?? ""
-        self.vadSensitivity = VadSensitivity(rawValue: ud.string(forKey: "vadSensitivity") ?? "") ?? .normal
         self.autoStopTimeout = {
             if ud.object(forKey: "autoStopTimeout") == nil { return .thirty }
             return AutoStopOption(rawValue: ud.integer(forKey: "autoStopTimeout")) ?? .thirty

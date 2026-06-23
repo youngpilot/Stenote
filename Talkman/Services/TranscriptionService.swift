@@ -177,7 +177,7 @@ final class TranscriptionService {
             do {
                 let vadConfig = VadSegmentationConfig(
                     minSpeechDuration: 0.25,         // Default 0.15 — filter click noises
-                    minSilenceDuration: SettingsStore.shared.vadSensitivity.minSilenceDuration,
+                    minSilenceDuration: 0.75,        // Used only for auto-stop + paragraph-break timing
                     speechPadding: 0.15,             // Default 0.1 — prevent clipped word edges
                     silenceThresholdForSplit: 0.25,  // Default 0.3 — more sensitive to true silence
                     negativeThresholdOffset: 0.12    // Default 0.15 — faster speech-end detection

@@ -307,7 +307,6 @@ struct MenuBarView: View {
         let r = TextReplacementService.shared
 
         if s.hotkeys != [.doubleRightOption] { items.append("Shortcuts → Double-press Right ⌥ only") }
-        if s.vadSensitivity != .normal { items.append("Pause sensitivity: \(s.vadSensitivity.label) → Normal") }
         if s.autoStopTimeout != .thirty { items.append("Auto-stop: \(s.autoStopTimeout.label) → 30s") }
         if !s.silenceMediaWhileRecording { items.append("Silence media while recording: off → on") }
         if !s.pauseMediaApps { items.append("Pause Spotify/Apple Music: off → on") }
@@ -856,28 +855,21 @@ private struct InlineSettingsView: View {
 
             // Recording
             SettingsCard(title: "Recording", isExpanded: expandedSection == "Recording", onToggle: { toggleSection("Recording") }) {
-                Toggle("Silence media while recording", isOn: Binding(
+                Toggle("Mute Media Playback while recording", isOn: Binding(
                     get: { settings.silenceMediaWhileRecording },
                     set: { settings.silenceMediaWhileRecording = $0 }
                 ))
                 .font(labelFont)
 
-                if settings.silenceMediaWhileRecording {
-                    Text("Mutes all system audio to true silence while you dictate, then restores it when you stop.")
-                        .font(labelFont)
-                        .foregroundStyle(.tertiary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    if !audioService.supportsVolumeControl {
-                        HStack(alignment: .top, spacing: 6) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundStyle(.orange)
-                            Text("This audio device can't be muted by software.")
-                                .foregroundStyle(.orange)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .font(labelFont)
+                if settings.silenceMediaWhileRecording, !audioService.supportsVolumeControl {
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        Text("This audio device can't be muted by software.")
+                            .foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
+                    .font(labelFont)
                 }
 
                 Toggle("Pause Spotify & Apple Music", isOn: Binding(
@@ -902,19 +894,6 @@ private struct InlineSettingsView: View {
                             .foregroundStyle(.tertiary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                }
-
-                settingsRow("Pause sensitivity") {
-                    Picker("", selection: Binding(
-                        get: { settings.vadSensitivity },
-                        set: { settings.vadSensitivity = $0 }
-                    )) {
-                        ForEach(VadSensitivity.allCases) { sensitivity in
-                            Text(sensitivity.label).tag(sensitivity)
-                        }
-                    }
-                    .labelsHidden()
-                    .fixedSize()
                 }
 
                 settingsRow("Auto-stop silence") {
