@@ -6,6 +6,7 @@ struct MenuBarView: View {
     @State private var audioService = SystemAudioService.shared
     @State private var updater = UpdateService.shared
     @State private var footerHover = false
+    @State private var topHover = false
     @State private var copiedFeedback = false
     @State private var showSettings = false
     @State private var copiedHistoryId: UUID?
@@ -57,16 +58,34 @@ struct MenuBarView: View {
             .buttonStyle(.plain)
         }
 
-        // Top bar: Shortcut hint + Settings + Quit
+        // Top bar: Shortcut hint (hover → Start/Stop button) + Settings + Quit
         HStack(spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(HotkeyChoice.allCases.filter { settings.hotkeys.contains($0) }.map { $0.label }.joined(separator: " or "))
-                    .font(.body)
-                    .fontWeight(.medium)
-                Text("Right-click the menubar icon")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
+            ZStack(alignment: .leading) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(HotkeyChoice.allCases.filter { settings.hotkeys.contains($0) }.map { $0.label }.joined(separator: " or "))
+                        .font(.body)
+                        .fontWeight(.medium)
+                    Text("Right-click the menubar icon")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                }
+                .opacity(topHover ? 0 : 1)
+
+                Button {
+                    recordingManager.toggle()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: recordingManager.isRecording ? "stop.fill" : "mic.fill")
+                        Text(recordingManager.isRecording ? "Stop Recording" : "Start Recording")
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .disabled(!recordingManager.isModelLoaded)
+                .opacity(topHover ? 1 : 0)
+                .allowsHitTesting(topHover)
             }
+            .onHover { topHover = $0 }
 
             Spacer()
 
