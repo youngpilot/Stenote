@@ -675,7 +675,6 @@ private struct InlineSettingsView: View {
     @State private var audioService = SystemAudioService.shared
     @State private var recordingManager = RecordingManager.shared
     @State private var updater = UpdateService.shared
-    @State private var ghHover = false
     @State private var newFrom = ""
     @State private var newTo = ""
     @State private var showFnKeyHint = false
@@ -1042,26 +1041,20 @@ private struct InlineSettingsView: View {
             }
 
             HStack {
+                Text("Stenote v\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
+                    .foregroundStyle(.quaternary)
                 Spacer()
-                // Version line; reveals a GitHub link on hover (opacity swap, no
-                // layout change — required inside MenuBarExtra).
-                ZStack(alignment: .trailing) {
-                    Text("Stenote v\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
-                        .opacity(ghHover ? 0 : 1)
-                    Text("Show Stenote on GitHub →")
-                        .opacity(ghHover ? 1 : 0)
-                }
-                .font(.caption)
-                .foregroundStyle(ghHover ? AnyShapeStyle(.tint) : AnyShapeStyle(.quaternary))
-                .contentShape(Rectangle())
-                .pointerStyle(.link)
-                .onHover { ghHover = $0 }
-                .onTapGesture {
-                    if let url = URL(string: "https://github.com/youngpilot/Stenote") {
-                        NSWorkspace.shared.open(url)
+                Text("Stenote on GitHub →")
+                    .foregroundStyle(.secondary)
+                    .contentShape(Rectangle())
+                    .pointerStyle(.link)
+                    .onTapGesture {
+                        if let url = URL(string: "https://github.com/youngpilot/Stenote") {
+                            NSWorkspace.shared.open(url)
+                        }
                     }
-                }
             }
+            .font(.caption)
         }
     }
 
