@@ -253,9 +253,6 @@ struct MenuBarView: View {
 
             // Revealed on hover
             HStack {
-                Text("Stenote v\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
-                    .foregroundStyle(.quaternary)
-                Spacer()
                 Text("Stenote on GitHub →")
                     .foregroundStyle(.secondary)
                     .pointerStyle(.link)
@@ -264,6 +261,9 @@ struct MenuBarView: View {
                             NSWorkspace.shared.open(url)
                         }
                     }
+                Spacer()
+                Text("Stenote v\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
+                    .foregroundStyle(.quaternary)
             }
             .font(.caption)
             .opacity(footerHover ? 1 : 0)
@@ -1085,9 +1085,6 @@ private struct InlineSettingsView: View {
             }
 
             HStack {
-                Text("Stenote v\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
-                    .foregroundStyle(.quaternary)
-                Spacer()
                 Text("Stenote on GitHub →")
                     .foregroundStyle(.secondary)
                     .contentShape(Rectangle())
@@ -1097,6 +1094,9 @@ private struct InlineSettingsView: View {
                             NSWorkspace.shared.open(url)
                         }
                     }
+                Spacer()
+                Text("Stenote v\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
+                    .foregroundStyle(.quaternary)
             }
             .font(.caption)
         }
