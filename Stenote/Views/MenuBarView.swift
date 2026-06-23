@@ -274,6 +274,8 @@ struct MenuBarView: View {
             .opacity(footerHover ? 1 : 0)
             .allowsHitTesting(footerHover)
         }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
         .contentShape(Rectangle())
         .onHover { footerHover = $0 }
     }
