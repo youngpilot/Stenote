@@ -109,6 +109,7 @@ The mic icon turns red while recording.
 - **Prefix/suffix text** — automatically prepend or append text to each transcription
 - **Transcription history** — last 10 recordings, click to copy
 - **Launch at Login** — via SMAppService
+- **Update checks** — your choice: *Manual* (no network calls at all, the default) or *Daily* (one lightweight GitHub check per day). No account, no telemetry.
 
 ## Requirements
 
