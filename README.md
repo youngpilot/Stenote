@@ -8,150 +8,78 @@
 
 _Free for private use · 100% on-device · no cloud, no API keys._
 
-Talkman is a native menubar app that turns your voice into text — directly in whatever app you're working in. You speak, you stop, and your words land at the cursor. Everything runs on your Mac: no cloud, no API keys, no account.
-
-Built on [NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3), running entirely on-device via Apple Neural Engine through the [FluidAudio SDK](https://github.com/FluidInference/FluidAudio). The model processes audio at **~120x real-time on M4 Pro**, so the moment you stop speaking your text is already there.
-
-## Why Talkman
-
-**Apple's built-in Dictation is slow, unreliable, and English-centric.** It sends your audio to Apple's servers, adds noticeable latency, frequently drops words, and struggles with accents, technical terms, and non-English languages.
-
-Talkman fixes all of that:
-
-- **Fast** — runs on your Neural Engine, far faster than real-time. Stop speaking and your text appears a moment later — no network round-trip, no server queue.
-- **Accurate** — Parakeet TDT v3 is a state-of-the-art 600M parameter model trained on 86,000+ hours of speech. It handles accents, technical jargon, and natural speech patterns that Apple Dictation mangles.
-- **Private** — your voice never leaves your Mac. Zero data sent anywhere. Ever.
-- **Truly multilingual** — automatic language detection across 25 European languages with the same model, the same accuracy, no switching required:
-
-  English, German, French, Spanish, Italian, Portuguese, Dutch, Polish, Czech, Romanian, Hungarian, Swedish, Danish, Finnish, Greek, Bulgarian, Croatian, Slovak, Slovenian, Estonian, Latvian, Lithuanian, Russian, Ukrainian, Maltese
-
-- **Reliable** — no "I didn't catch that", no phantom words, no random stops. VAD-based speech detection means it transcribes exactly when you speak and stops exactly when you don't.
+Talkman is a native menubar app that turns your voice into text in any app. Speak, stop, and your words land at the cursor — everything runs on your Mac. Built on [NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) on the Apple Neural Engine (via the [FluidAudio SDK](https://github.com/FluidInference/FluidAudio)): faster than real-time, low hallucination, and 25 European languages auto-detected — even mixed in one sentence.
 
 ## How Talkman compares
 
-Most dictation tools make you trade something away: privacy for polish, or price for accuracy. Talkman's edge is refusing that trade. It is private, local, focused, and free at the same time.
-
-| | Talkman | Apple Dictation (macOS Tahoe) | Wispr Flow | Whisper apps (superwhisper, MacWhisper) |
+| | Talkman | Apple Dictation | Wispr Flow | Whisper apps¹ |
 |---|---|---|---|---|
-| **Compute** | 🟢 100% on-device (Neural Engine) | 🟢 On-device | 🔴 Cloud | 🟢 On-device |
-| **Privacy** | 🟢 Audio never leaves your Mac | 🟢 Stays on device | 🔴 Audio uploaded to the cloud; "Privacy Mode" only limits retention | 🟢 Stays on device |
-| **Price** | 🟢 Free, unlimited | 🟢 Free | 🟡 Free tier ~2,000 words/week; Pro $15/mo ($144/yr) | 🟡 Freemium or paid (subscription or one-time) |
-| **Languages** | 🟢 25 European, auto-detected with no manual switching, even German and English mixed in one sentence | 🟡 Several, but you switch by hand (Globe key) | 🟢 100+ (cloud) | 🟡 Many, but usually one model per language or a manual pick |
-| **Accuracy model** | 🟢 Parakeet TDT v3, a transducer that minimizes hallucination | 🔴 Apple on-device model; silence cutoffs, no custom vocabulary, accuracy regressions across releases | 🟢 Cloud models with strong auto-formatting | 🟡 Whisper: accurate, but prone to hallucinate during silence |
-| **Footprint** | 🟡 16 MB app, ~460 MB model on first run, then fully offline | 🟢 Built into macOS | 🟡 Tiny app, but needs internet for every dictation | 🔴 Larger models (Whisper large is ~1.5 GB) |
-| **Design** | 🟢 Minimal menubar app, types into any app | 🟡 System feature | 🟢 Polished, with AI commands and formatting | 🟡 File transcription plus power features |
+| **Compute** | 🟢 On-device (ANE) | 🟢 On-device | 🔴 Cloud | 🟢 On-device |
+| **Privacy** | 🟢 Never leaves your Mac | 🟢 On device | 🔴 Audio uploaded | 🟢 On device |
+| **Price** | 🟢 Free, unlimited | 🟢 Free | 🟡 Free ~2k words/wk, then $15/mo | 🟡 Freemium or paid |
+| **Languages** | 🟢 25, auto-detected, mixable | 🟡 Manual switch | 🟢 100+ (cloud) | 🟡 Per-model / manual |
+| **Accuracy** | 🟢 Parakeet TDT, low hallucination | 🔴 Cutoffs, no custom vocab | 🟢 Strong (cloud) | 🟡 Whisper hallucinates on silence |
+| **Mute / pause music while recording** | 🟢 Mutes output + pauses Spotify/Music | 🔴 None | 🟡 Mutes output only | 🟡 superwhisper yes, MacWhisper no |
+| **Footprint** | 🟡 16 MB app + ~460 MB model, then offline | 🟢 Built in | 🟡 Tiny, but always online | 🔴 ~1.5 GB models |
+| **Design** | 🟢 Minimal menubar | 🟡 System feature | 🟢 Polished, AI commands | 🟡 Power features |
 
-Legend: 🟢 strength · 🟡 okay or mixed · 🔴 limiting
+¹ superwhisper, MacWhisper.  ·  Legend: 🟢 strength · 🟡 mixed · 🔴 limiting
 
-What this means in practice:
-
-- **Versus Apple Dictation:** both are private and on-device, but Apple makes you switch languages by hand, cuts off after pauses, has no custom vocabulary, and regresses between macOS releases. Talkman just listens, detects the language automatically (even when you mix German and English), and types.
-- **Versus Wispr Flow:** Wispr is polished, but every word is processed in the cloud and the free tier runs out at about 2,000 words per week (roughly 15 minutes of talking). Talkman is unlimited and free, and your voice never leaves the machine.
-- **Versus Whisper apps:** same on-device privacy, but Whisper models are larger and tend to invent text during silence. Parakeet TDT is smaller, faster, and far less hallucination-prone, which is exactly what you want when the text lands straight in your editor.
-
-Talkman deliberately does less: no account, no subscription, no cloud, no feature bloat. Just fast, private, reliable dictation in any app.
-
-## Remove the Keyboard Bottleneck
-
-Most people type at 40-80 WPM. You speak at 150+ WPM. Talkman closes that gap — everything you'd normally type, you can now dictate at 2-3x the speed with zero accuracy loss.
-
-**Best use cases:**
-
-- **Writing emails and messages** — draft replies in seconds instead of minutes
-- **Meeting notes and documentation** — speak your thoughts while they're fresh, get clean text the moment you stop
-- **AI prompting** — dictate complex prompts to ChatGPT, Claude, Cursor, or any LLM tool faster than you can type them. Describe what you want in natural speech — no more wrestling with keyboard input for multi-paragraph instructions
-- **Coding comments and commit messages** — describe what your code does without breaking flow
-- **Chat and Slack** — respond at the speed of conversation
-- **Journaling and brainstorming** — capture ideas faster than you can think them through
-- **Long-form writing** — articles, reports, specs — dictate the first draft, then edit
-- **Accessibility** — for anyone with RSI, carpal tunnel, or motor impairments, voice input isn't a convenience — it's a necessity
-
-Talkman works in **any text field, in any app** — your editor, browser, terminal, Notion, Slack, Mail, whatever has focus.
-
-## Install
-
-1. Download `Talkman-0.7.3.dmg` from the [latest release](https://github.com/youngpilot/Talkman/releases/latest)
-2. Open the DMG and drag Talkman to Applications
-3. Launch Talkman — grant Microphone and Accessibility permissions when prompted
-4. The speech model downloads automatically on first launch (~460 MB, one-time — then fully offline). The optional word-boosting model adds ~100 MB only if you turn it on.
-
-> If macOS says the app "cannot be opened because the developer cannot be verified," right-click the app → **Open** → **Open**. Released builds are notarized, so this only happens with copies you build yourself.
-
-Requires **macOS 15.2+** and **Apple Silicon** (M1 or later).
-
-## Usage
-
-1. **Double-press Right ⌥** (or your configured hotkey) to start recording
-2. Speak naturally — Talkman detects speech pauses and transcribes on-device
-3. Text is pasted into whatever app was focused when you started
-4. Press the hotkey again, or let auto-stop end the session after silence
-
-You can also **right-click the menubar icon** to toggle recording, or **left-click** to open the settings panel.
-
-The mic icon turns red while recording.
-
-<p align="center">
-  <img src="assets/screenshot-main.png" alt="Main menu" width="340">
-  &nbsp;&nbsp;&nbsp;
-  <img src="assets/screenshot-settings.png" alt="Settings" width="340">
-</p>
+In short: Apple Dictation is private but weak, Wispr Flow is polished but cloud and paid, Whisper apps are local but heavier and hallucination-prone. Talkman is private, local, accurate, and free — without the trade-off.
 
 ## Features
 
-- **Accuracy-first transcription** — Talkman transcribes your full utterance on continuous context for maximum accuracy, then inserts the text when you stop speaking.
-- **25 languages, auto-detected** — speak in any supported language and Talkman recognizes it automatically. No language switching needed.
-- **Menubar-only** — lives in your menu bar, no dock icon, no windows, out of your way
-- **Global hotkey** — double-press Right ⌥ to toggle recording (configurable: Right ⌘, ⌥ + Space, Fn + Space, F5, Fn/🌐 — multiple shortcuts can be active simultaneously)
-- **Right-click to record** — right-click the menubar icon to start/stop recording
-- **Media control while recording** — two independent options (both on by default): mute all system audio to silence, and pause/resume Spotify or Apple Music
-- **Smart clipboard** — uses concealed pasteboard type so clipboard managers (Maccy, Paste, Alfred) ignore transcription pastes; restores your clipboard after each session
-- **Word corrections** — teach Talkman your brand names with custom word replacements + vocabulary boosting
-- **Paragraph breaks** — automatically inserts paragraph breaks after 2.5s+ pauses
-- **Auto-stop** — configurable silence timeout (10s-60s or off)
-- **Prefix/suffix text** — automatically prepend or append text to each transcription
-- **Transcription history** — click any entry to copy; history length is configurable (from none to unlimited)
-- **Launch at Login** — via SMAppService
-- **Update checks** — your choice: *Manual* (no network calls at all, the default) or *Daily* (one lightweight GitHub check per day). No account, no telemetry.
+- **Accuracy-first** — transcribes your full utterance on continuous context, then inserts it when you stop.
+- **25 languages, auto-detected** — no switching, even mixing German and English mid-sentence.
+- **Global hotkey** — double-press Right ⌥ by default (also Right ⌘, ⌥+Space, Fn+Space, F5, Fn/🌐; several can be active at once). Right-click the menubar icon to toggle.
+- **Mute & pause media** — independently mute system audio and/or pause Spotify & Apple Music while recording (both on by default).
+- **Word corrections** — custom replacements for names and jargon, with optional model boosting.
+- **History** — click any entry to copy; length configurable, from none to unlimited.
+- **Smart clipboard** — uses a concealed type so clipboard managers ignore pastes, and restores your clipboard afterward.
+- **Also** — auto-stop on silence, paragraph breaks, prefix/suffix text, launch at login, menubar-only (no dock icon).
+- **Updates** — *Manual* (no network calls, the default) or *Daily* (one lightweight GitHub check). No account, no telemetry.
 
-## Requirements
+<details><summary>All 25 languages</summary>
 
-- macOS 15.2+
-- Apple Silicon (M1 or later) — runs inference on Neural Engine
-- Microphone permission
-- Accessibility permission (for simulating Cmd+V paste into target apps)
+English, German, French, Spanish, Italian, Portuguese, Dutch, Polish, Czech, Romanian, Hungarian, Swedish, Danish, Finnish, Greek, Bulgarian, Croatian, Slovak, Slovenian, Estonian, Latvian, Lithuanian, Russian, Ukrainian, Maltese.
 
-## Tech Stack
+</details>
 
-- Swift 6 + SwiftUI
-- FluidAudio SDK 0.13.0 (Parakeet TDT v3 CoreML, Silero VAD, CTC vocabulary boosting)
-- Apple Neural Engine for inference
-- AVAudioEngine for mic capture (16kHz mono)
-- CGEvent for paste simulation
-- NSEvent global monitors for hotkey detection
+## Install
 
-## Building from Source
+1. Download `Talkman-0.7.3.dmg` from the [latest release](https://github.com/youngpilot/Talkman/releases/latest).
+2. Open it, drag **Talkman** to Applications, and launch.
+3. Grant **Microphone** and **Accessibility** when prompted. The speech model (~460 MB) downloads once, then runs fully offline.
 
-Requires **Xcode 16+** (developed on Xcode 26.5) and an Apple Silicon Mac.
+Requires **macOS 15.2+** and **Apple Silicon** (M1 or later).
+
+> If macOS says the developer can't be verified, right-click the app → **Open**. (Released builds are notarized; this only affects copies you build yourself.)
+
+## Usage
+
+Double-press **Right ⌥** to start, speak, then press again — or let it auto-stop after silence — and the text lands wherever your cursor is. Left-click the menubar icon for settings; the icon turns red while recording.
+
+<p align="center">
+  <img src="assets/screenshot-main.png" alt="Talkman menu" width="340">
+</p>
+
+## Build from source
+
+Swift 6 + SwiftUI. Requires **Xcode 16+** (developed on 26.5) and Apple Silicon.
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
   xcodebuild -project Talkman.xcodeproj -scheme Talkman -configuration Debug build
 ```
 
-The first build resolves the FluidAudio Swift package automatically. To produce a signed build, set your own Apple Developer Team in Xcode (*Signing & Capabilities*) or override `DEVELOPMENT_TEAM`. Models are downloaded automatically on first launch (~460 MB, one-time).
+The FluidAudio package resolves automatically; models download on first launch. For a signed build, set your own Apple Developer Team in *Signing & Capabilities*.
 
-## Experimental
-
-The `TalkmanIM/` directory contains a work-in-progress system-wide **input method extension** (an alternative to clipboard-paste insertion). It is **not yet wired into the app** and is not required to build or run Talkman — treat it as experimental. Build it standalone with `scripts/build-ime.sh` (requires your own Apple Developer signing identity).
+> `TalkmanIM/` is an experimental, not-yet-wired-in system-wide input method — optional, not needed to build or run Talkman.
 
 ## Credits
 
-- Menubar icon: [Solar](https://icon-sets.iconify.design/solar/) by 480 Design (CC BY 4.0)
-- ASR model: [NVIDIA Parakeet TDT](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) (Apache 2.0)
-- Audio SDK: [FluidAudio](https://github.com/FluidInference/FluidAudio)
+[NVIDIA Parakeet TDT v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) (Apache 2.0) · [FluidAudio](https://github.com/FluidInference/FluidAudio) · icon [Solar](https://icon-sets.iconify.design/solar/) by 480 Design (CC BY 4.0).
 
 ## License
 
-**Talkman is free for private use.** It is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE) — you may use, modify, and share it for any noncommercial purpose (personal use, hobby projects, study, and noncommercial organizations). Commercial use is not permitted.
-
-Copyright © 2026 Julian Schiemann.
+**Free for private use** under the [PolyForm Noncommercial License 1.0.0](LICENSE): any noncommercial use (personal, hobby, study). Commercial use is not permitted. © 2026 Julian Schiemann.
