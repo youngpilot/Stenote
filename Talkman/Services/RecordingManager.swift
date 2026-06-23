@@ -83,6 +83,9 @@ final class RecordingManager {
             logger.error("Failed to load model: \(error.localizedDescription)")
         }
         isModelLoading = false
+
+        // Daily update check (no-op in Manual mode; at most one GET per 24h).
+        Task { await UpdateService.shared.autoCheckIfDue() }
     }
 
     func toggle() {

@@ -88,6 +88,20 @@ enum HotkeyChoice: String, CaseIterable, Identifiable {
     }
 }
 
+enum UpdateCheckMode: String, CaseIterable, Identifiable {
+    case manual = "manual"   // no automatic outbound calls
+    case daily = "daily"     // one background check per 24h
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .manual: "Manual"
+        case .daily: "Daily"
+        }
+    }
+}
+
 @Observable
 @MainActor
 final class SettingsStore {
@@ -155,6 +169,10 @@ final class SettingsStore {
         didSet { UserDefaults.standard.set(enableVoiceCommands, forKey: "enableVoiceCommands") }
     }
 
+    var updateCheckMode: UpdateCheckMode {
+        didSet { UserDefaults.standard.set(updateCheckMode.rawValue, forKey: "updateCheckMode") }
+    }
+
     var historyPreviewLines: Int {
         didSet { UserDefaults.standard.set(historyPreviewLines, forKey: "historyPreviewLines") }
     }
@@ -176,6 +194,7 @@ final class SettingsStore {
         enableVocabBoosting = false
         insertionMode = .auto
         enableVoiceCommands = false
+        updateCheckMode = .manual
         historyPreviewLines = 3
         exportDirectory = SettingsStore.defaultDownloadsPath
     }
@@ -203,6 +222,7 @@ final class SettingsStore {
         self.enableVocabBoosting = ud.object(forKey: "enableVocabBoosting") == nil ? false : ud.bool(forKey: "enableVocabBoosting")
         self.insertionMode = InsertionMode(rawValue: ud.string(forKey: "insertionMode") ?? "") ?? .auto
         self.enableVoiceCommands = ud.bool(forKey: "enableVoiceCommands")
+        self.updateCheckMode = UpdateCheckMode(rawValue: ud.string(forKey: "updateCheckMode") ?? "") ?? .manual
         self.historyPreviewLines = ud.object(forKey: "historyPreviewLines") == nil ? 3 : ud.integer(forKey: "historyPreviewLines")
         self.exportDirectory = ud.string(forKey: "exportDirectory") ?? SettingsStore.defaultDownloadsPath
     }

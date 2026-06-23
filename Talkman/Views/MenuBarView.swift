@@ -4,6 +4,7 @@ struct MenuBarView: View {
     @State private var recordingManager = RecordingManager.shared
     @State private var settings = SettingsStore.shared
     @State private var audioService = SystemAudioService.shared
+    @State private var updater = UpdateService.shared
     @State private var copiedFeedback = false
     @State private var showSettings = false
     @State private var copiedHistoryId: UUID?
@@ -33,6 +34,28 @@ struct MenuBarView: View {
 
     @ViewBuilder
     private var mainSection: some View {
+        // Update banner (only when a newer release is available)
+        if updater.updateAvailable, let url = updater.releaseURL {
+            Link(destination: url) {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.down.circle.fill")
+                        .foregroundStyle(.green)
+                    Text("Update available" + (updater.latestVersion.map { " — v\($0)" } ?? ""))
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    Image(systemName: "arrow.up.forward.app")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .font(.body)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color.green.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+
         // Top bar: Shortcut hint + Settings + Quit
         HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
@@ -652,6 +675,7 @@ private struct InlineSettingsView: View {
     @State private var replacementService = TextReplacementService.shared
     @State private var audioService = SystemAudioService.shared
     @State private var recordingManager = RecordingManager.shared
+    @State private var updater = UpdateService.shared
     @State private var newFrom = ""
     @State private var newTo = ""
     @State private var showFnKeyHint = false
@@ -961,6 +985,65 @@ private struct InlineSettingsView: View {
             // Word list — outside SettingsCard so @Observable triggers correctly
             if expandedSection == "Word Corrections" {
                 wordListSection
+            }
+
+            // Updates
+            SettingsCard(title: "Updates", isExpanded: expandedSection == "Updates", onToggle: { toggleSection("Updates") }) {
+                settingsRow("Check for updates") {
+                    Picker("", selection: Binding(
+                        get: { settings.updateCheckMode },
+                        set: { newMode in
+                            settings.updateCheckMode = newMode
+                            if newMode == .daily { Task { await updater.autoCheckIfDue() } }
+                        }
+                    )) {
+                        ForEach(UpdateCheckMode.allCases) { Text($0.label).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .fixedSize()
+                }
+
+                Text(settings.updateCheckMode == .daily
+                     ? "Talkman checks GitHub once a day. One request, no account, nothing sent."
+                     : "No automatic checks. Talkman makes no network calls unless you press Check Now.")
+                    .font(labelFont)
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 8) {
+                    Button {
+                        Task { await updater.checkNow() }
+                    } label: {
+                        Text(updater.isChecking ? "Checking…" : "Check Now")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(updater.isChecking)
+                    Spacer()
+                }
+
+                if updater.updateAvailable, let v = updater.latestVersion, let url = updater.releaseURL {
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "arrow.down.circle.fill")
+                            .foregroundStyle(.green)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Update available: v\(v)")
+                            Link("Download from GitHub", destination: url)
+                        }
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .font(labelFont)
+                } else if updater.lastCheckFailed {
+                    Text("Couldn't reach GitHub. Check your connection and try Check Now again.")
+                        .font(labelFont)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if updater.lastChecked != nil {
+                    Text("You're on the latest version (v\(updater.currentVersion)).")
+                        .font(labelFont)
+                        .foregroundStyle(.tertiary)
+                }
             }
 
             HStack {
