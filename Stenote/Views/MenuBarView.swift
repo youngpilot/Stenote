@@ -75,12 +75,19 @@ struct MenuBarView: View {
                     recordingManager.toggle()
                 } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: recordingManager.isRecording ? "stop.fill" : "mic.fill")
+                        if recordingManager.isRecording {
+                            Image(systemName: "stop.fill")
+                        } else {
+                            Image(nsImage: StenoteApp.micIdleIcon)
+                                .resizable()
+                                .renderingMode(.template)
+                                .frame(width: 15, height: 15)
+                        }
                         Text(recordingManager.isRecording ? "Stop Recording" : "Start Recording")
                     }
+                    .fontWeight(.medium)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
+                .buttonStyle(PopoverButtonStyle(prominent: true))
                 .disabled(!recordingManager.isModelLoaded)
                 .opacity(topHover ? 1 : 0)
                 .allowsHitTesting(topHover)
@@ -98,8 +105,7 @@ struct MenuBarView: View {
                     .frame(width: 16, height: 16)
             }
             .keyboardShortcut(",", modifiers: .command)
-            .buttonStyle(.bordered)
-            .controlSize(.regular)
+            .buttonStyle(PopoverButtonStyle())
 
             Button {
                 NSApplication.shared.terminate(nil)
@@ -109,8 +115,7 @@ struct MenuBarView: View {
                     .frame(width: 16, height: 16)
             }
             .keyboardShortcut("q", modifiers: .command)
-            .buttonStyle(.bordered)
-            .controlSize(.regular)
+            .buttonStyle(PopoverButtonStyle())
         }
 
         // Model loading progress
@@ -480,7 +485,12 @@ struct MenuBarView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(DesignTokens.Spacing.s)
-        .background(hoveredHistoryId == entry.id ? AnyShapeStyle(.thinMaterial) : AnyShapeStyle(.ultraThinMaterial), in: RoundedRectangle(cornerRadius: 8))
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: 8).fill(.ultraThinMaterial)
+                RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(hoveredHistoryId == entry.id ? 0.12 : 0))
+            }
+        )
         .overlay {
             let isActive = copiedHistoryId == entry.id || savedHistoryId == entry.id
             RoundedRectangle(cornerRadius: 8)
@@ -644,6 +654,27 @@ struct MenuBarView: View {
             return .green
         }
         return .secondary
+    }
+}
+
+// MARK: - Button style
+
+/// Borderless button with a clearly visible hover and press highlight.
+private struct PopoverButtonStyle: ButtonStyle {
+    var prominent = false
+    @State private var hovering = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding(.horizontal, prominent ? 14 : 9)
+            .padding(.vertical, prominent ? 8 : 7)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.primary.opacity(configuration.isPressed ? 0.20 : (hovering ? 0.13 : 0.06)))
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 8))
+            .onHover { hovering = $0 }
+            .animation(.easeOut(duration: 0.12), value: hovering)
     }
 }
 
