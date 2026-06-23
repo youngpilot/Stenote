@@ -8,9 +8,9 @@
 
 _Free for private use · 100% on-device · no cloud, no API keys._
 
-Talkman is a native menubar app that transcribes your voice in real time — directly into whatever app you're working in. No cloud. No API keys. No latency. Just speak and watch text appear instantly.
+Talkman is a native menubar app that turns your voice into text — directly in whatever app you're working in. You speak, you stop, and your words land at the cursor. Everything runs on your Mac: no cloud, no API keys, no account.
 
-Built on [NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3), running entirely on-device via Apple Neural Engine through [FluidAudio SDK](https://github.com/AntAudioIntelligence/FluidAudio). Transcription runs at **~120x real-time on M4 Pro** — faster than you can speak.
+Built on [NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3), running entirely on-device via Apple Neural Engine through the [FluidAudio SDK](https://github.com/FluidInference/FluidAudio). The model processes audio at **~120x real-time on M4 Pro**, so the moment you stop speaking your text is already there.
 
 ## Why Talkman
 
@@ -18,7 +18,7 @@ Built on [NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-td
 
 Talkman fixes all of that:
 
-- **Instant** — transcription happens on your Neural Engine in milliseconds, not seconds. No network round-trip, no waiting.
+- **Fast** — runs on your Neural Engine, far faster than real-time. Stop speaking and your text appears a moment later — no network round-trip, no server queue.
 - **Accurate** — Parakeet TDT v3 is a state-of-the-art 600M parameter model trained on 86,000+ hours of speech. It handles accents, technical jargon, and natural speech patterns that Apple Dictation mangles.
 - **Private** — your voice never leaves your Mac. Zero data sent anywhere. Ever.
 - **Truly multilingual** — automatic language detection across 25 European languages with the same model, the same accuracy, no switching required:
@@ -56,7 +56,7 @@ Most people type at 40-80 WPM. You speak at 150+ WPM. Talkman closes that gap �
 **Best use cases:**
 
 - **Writing emails and messages** — draft replies in seconds instead of minutes
-- **Meeting notes and documentation** — speak your thoughts while they're fresh, get clean text instantly
+- **Meeting notes and documentation** — speak your thoughts while they're fresh, get clean text the moment you stop
 - **AI prompting** — dictate complex prompts to ChatGPT, Claude, Cursor, or any LLM tool faster than you can type them. Describe what you want in natural speech — no more wrestling with keyboard input for multi-paragraph instructions
 - **Coding comments and commit messages** — describe what your code does without breaking flow
 - **Chat and Slack** — respond at the speed of conversation
@@ -96,7 +96,7 @@ The mic icon turns red while recording.
 
 ## Features
 
-- **Streaming transcription** — confirmed text is inserted incrementally as you speak, with maximum accuracy from continuous context.
+- **Accuracy-first transcription** — Talkman transcribes your full utterance on continuous context for maximum accuracy, then inserts the text when you stop speaking.
 - **25 languages, auto-detected** — speak in any supported language and Talkman recognizes it automatically. No language switching needed.
 - **Menubar-only** — lives in your menu bar, no dock icon, no windows, out of your way
 - **Global hotkey** — double-press Right ⌥ to toggle recording (configurable: Right ⌘, ⌥ + Space, Fn + Space, F5, Fn/🌐 — multiple shortcuts can be active simultaneously)
@@ -146,7 +146,7 @@ The `TalkmanIM/` directory contains a work-in-progress system-wide **input metho
 
 - Menubar icon: [Solar](https://icon-sets.iconify.design/solar/) by 480 Design (CC BY 4.0)
 - ASR model: [NVIDIA Parakeet TDT](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) (Apache 2.0)
-- Audio SDK: [FluidAudio](https://github.com/AntAudioIntelligence/FluidAudio)
+- Audio SDK: [FluidAudio](https://github.com/FluidInference/FluidAudio)
 
 ## License
 
