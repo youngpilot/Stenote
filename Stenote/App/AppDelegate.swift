@@ -10,13 +10,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         logger.info("Stenote launching...")
-        requestMicrophonePermission()
-        requestAccessibilityPermission()
         installRightClickMonitor()
         configureMenuBarPanel()
 
-        // Start model loading immediately on launch
         Task { @MainActor in
+            // First launch: show onboarding (it handles the permission prompts).
+            // Otherwise re-validate permissions (no prompt if already decided).
+            if SettingsStore.shared.hasCompletedOnboarding {
+                requestMicrophonePermission()
+                requestAccessibilityPermission()
+            } else {
+                OnboardingPresenter.shared.show()
+            }
+
             logger.info("Starting model loading...")
             await RecordingManager.shared.setup()
             logger.info("Model loading complete")

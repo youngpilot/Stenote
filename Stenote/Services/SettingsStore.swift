@@ -165,6 +165,10 @@ final class SettingsStore {
         didSet { UserDefaults.standard.set(updateCheckMode.rawValue, forKey: "updateCheckMode") }
     }
 
+    var hasCompletedOnboarding: Bool {
+        didSet { UserDefaults.standard.set(hasCompletedOnboarding, forKey: "hasCompletedOnboarding") }
+    }
+
     var historyPreviewLines: Int {
         didSet { UserDefaults.standard.set(historyPreviewLines, forKey: "historyPreviewLines") }
     }
@@ -227,6 +231,7 @@ final class SettingsStore {
         self.insertionMode = InsertionMode(rawValue: ud.string(forKey: "insertionMode") ?? "") ?? .auto
         self.enableVoiceCommands = ud.bool(forKey: "enableVoiceCommands")
         self.updateCheckMode = UpdateCheckMode(rawValue: ud.string(forKey: "updateCheckMode") ?? "") ?? .manual
+        self.hasCompletedOnboarding = ud.bool(forKey: "hasCompletedOnboarding")
         self.historyPreviewLines = ud.object(forKey: "historyPreviewLines") == nil ? 3 : ud.integer(forKey: "historyPreviewLines")
         self.historyLength = ud.object(forKey: "historyLength") == nil ? .twenty : (HistoryLength(rawValue: ud.integer(forKey: "historyLength")) ?? .twenty)
         self.exportDirectory = ud.string(forKey: "exportDirectory") ?? SettingsStore.defaultDownloadsPath

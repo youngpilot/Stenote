@@ -928,6 +928,14 @@ private struct InlineSettingsView: View {
                         .font(labelFont)
                         .foregroundStyle(.tertiary)
                 }
+
+                Divider().opacity(0.5)
+
+                Button("Show welcome screen again") {
+                    OnboardingPresenter.shared.show()
+                }
+                .buttonStyle(.link)
+                .font(labelFont)
             }
 
             // Recording
