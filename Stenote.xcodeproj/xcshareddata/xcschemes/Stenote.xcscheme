@@ -16,9 +16,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "A10006000000000000000001"
-               BuildableName = "Talkman.app"
-               BlueprintName = "Talkman"
-               ReferencedContainer = "container:Talkman.xcodeproj">
+               BuildableName = "Stenote.app"
+               BlueprintName = "Stenote"
+               ReferencedContainer = "container:Stenote.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -45,9 +45,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A10006000000000000000001"
-            BuildableName = "Talkman.app"
-            BlueprintName = "Talkman"
-            ReferencedContainer = "container:Talkman.xcodeproj">
+            BuildableName = "Stenote.app"
+            BlueprintName = "Stenote"
+            ReferencedContainer = "container:Stenote.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -62,9 +62,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A10006000000000000000001"
-            BuildableName = "Talkman.app"
-            BlueprintName = "Talkman"
-            ReferencedContainer = "container:Talkman.xcodeproj">
+            BuildableName = "Stenote.app"
+            BlueprintName = "Stenote"
+            ReferencedContainer = "container:Stenote.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

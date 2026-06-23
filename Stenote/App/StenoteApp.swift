@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct TalkmanApp: App {
+struct StenoteApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var recordingManager = RecordingManager.shared
 

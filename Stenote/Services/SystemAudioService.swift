@@ -3,7 +3,7 @@ import CoreAudio
 import Observation
 import os
 
-private let logger = Logger(subsystem: "com.youngpilot.Talkman", category: "SystemAudio")
+private let logger = Logger(subsystem: "com.youngpilot.Stenote", category: "SystemAudio")
 
 /// Fades system audio and pauses/resumes media playback during recording.
 @Observable

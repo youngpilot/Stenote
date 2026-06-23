@@ -137,7 +137,7 @@ struct MenuBarView: View {
                     Text("Accessibility permission required")
                         .font(.body)
                         .fontWeight(.medium)
-                    Text("Talkman needs this to type text into other apps.")
+                    Text("Stenote needs this to type text into other apps.")
                         .font(.body)
                         .foregroundStyle(.secondary)
                 }
@@ -480,13 +480,13 @@ struct MenuBarView: View {
 
     private func saveEntryAsTxt(_ entry: HistoryEntry) {
         let dir = SettingsStore.shared.exportDirectory
-        let filename = "Talkman_\(entry.formattedId)_\(formatDurationFilename(entry.duration)).txt"
+        let filename = "Stenote_\(entry.formattedId)_\(formatDurationFilename(entry.duration)).txt"
         let url = URL(fileURLWithPath: dir).appendingPathComponent(filename)
 
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
 
-        var content = "Talkman Recording #\(entry.formattedId)\n"
+        var content = "Stenote Recording #\(entry.formattedId)\n"
         content += "Date: \(dateFormatter.string(from: entry.timestamp))\n"
         if let duration = entry.duration {
             content += "Duration: \(formatDuration(duration))\n"
@@ -812,8 +812,8 @@ private struct InlineSettingsView: View {
                 }
 
                 Text(settings.updateCheckMode == .daily
-                     ? "Talkman checks GitHub once a day. One request, no account, nothing sent."
-                     : "No automatic checks. Talkman makes no network calls unless you press Check Now.")
+                     ? "Stenote checks GitHub once a day. One request, no account, nothing sent."
+                     : "No automatic checks. Stenote makes no network calls unless you press Check Now.")
                     .font(labelFont)
                     .foregroundStyle(.tertiary)
                     .fixedSize(horizontal: false, vertical: true)

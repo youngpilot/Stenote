@@ -1,28 +1,28 @@
 import AppKit
 import InputMethodKit
 
-// Notification names shared between Talkman main app and this IME process.
+// Notification names shared between Stenote main app and this IME process.
 extension Notification.Name {
-    static let talkmanStartComposition  = Notification.Name("com.youngpilot.Talkman.startComposition")
-    static let talkmanUpdateComposition = Notification.Name("com.youngpilot.Talkman.updateComposition")
-    static let talkmanCommitComposition = Notification.Name("com.youngpilot.Talkman.commitComposition")
-    static let talkmanCancelComposition = Notification.Name("com.youngpilot.Talkman.cancelComposition")
+    static let stenoteStartComposition  = Notification.Name("com.youngpilot.Stenote.startComposition")
+    static let stenoteUpdateComposition = Notification.Name("com.youngpilot.Stenote.updateComposition")
+    static let stenoteCommitComposition = Notification.Name("com.youngpilot.Stenote.commitComposition")
+    static let stenoteCancelComposition = Notification.Name("com.youngpilot.Stenote.cancelComposition")
 }
 
 final class NotificationBridge {
     static let shared = NotificationBridge()
 
     // The currently active IMKInputController (set by activateServer / deactivateServer).
-    weak var activeController: TalkmanInputController?
+    weak var activeController: StenoteInputController?
 
     private init() {}
 
     func start() {
         let dnc = DistributedNotificationCenter.default()
-        dnc.addObserver(self, selector: #selector(handleStart(_:)),  name: .talkmanStartComposition,  object: nil)
-        dnc.addObserver(self, selector: #selector(handleUpdate(_:)), name: .talkmanUpdateComposition, object: nil)
-        dnc.addObserver(self, selector: #selector(handleCommit(_:)), name: .talkmanCommitComposition, object: nil)
-        dnc.addObserver(self, selector: #selector(handleCancel(_:)), name: .talkmanCancelComposition, object: nil)
+        dnc.addObserver(self, selector: #selector(handleStart(_:)),  name: .stenoteStartComposition,  object: nil)
+        dnc.addObserver(self, selector: #selector(handleUpdate(_:)), name: .stenoteUpdateComposition, object: nil)
+        dnc.addObserver(self, selector: #selector(handleCommit(_:)), name: .stenoteCommitComposition, object: nil)
+        dnc.addObserver(self, selector: #selector(handleCancel(_:)), name: .stenoteCancelComposition, object: nil)
     }
 
     // MARK: - Handlers

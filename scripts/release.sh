@@ -1,11 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 
-VERSION="0.7.3"
-APP_NAME="Talkman"
-TEAM_ID="${TALKMAN_TEAM_ID:?Set TALKMAN_TEAM_ID env var (Apple Developer Team ID)}"
-BUNDLE_ID="com.youngpilot.Talkman"
-IDENTITY="Developer ID Application: ${TALKMAN_SIGNER_NAME:?Set TALKMAN_SIGNER_NAME env var (e.g. 'Your Name')} ($TEAM_ID)"
+VERSION="0.8.0"
+APP_NAME="Stenote"
+TEAM_ID="${STENOTE_TEAM_ID:?Set STENOTE_TEAM_ID env var (Apple Developer Team ID)}"
+BUNDLE_ID="com.youngpilot.Stenote"
+IDENTITY="Developer ID Application: ${STENOTE_SIGNER_NAME:?Set STENOTE_SIGNER_NAME env var (e.g. 'Your Name')} ($TEAM_ID)"
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="$PROJECT_DIR/build/release"
@@ -20,8 +20,8 @@ rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild \
-    -project "$PROJECT_DIR/Talkman.xcodeproj" \
-    -scheme Talkman \
+    -project "$PROJECT_DIR/Stenote.xcodeproj" \
+    -scheme Stenote \
     -configuration Release \
     CODE_SIGN_STYLE=Manual \
     CODE_SIGN_IDENTITY="$IDENTITY" \

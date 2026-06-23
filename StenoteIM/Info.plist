@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>com.youngpilot.Talkman.InputMethod</string>
+    <string>com.youngpilot.Stenote.InputMethod</string>
     <key>CFBundleName</key>
-    <string>TalkmanIM</string>
+    <string>StenoteIM</string>
     <key>CFBundleDisplayName</key>
-    <string>Talkman</string>
+    <string>Stenote</string>
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>CFBundleShortVersionString</key>
@@ -15,20 +15,20 @@
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleExecutable</key>
-    <string>TalkmanIM</string>
+    <string>StenoteIM</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>LSMinimumSystemVersion</key>
     <string>15.2</string>
     <key>InputMethodConnectionName</key>
-    <string>com.youngpilot.TalkmanIM.IMK_Connection</string>
+    <string>com.youngpilot.StenoteIM.IMK_Connection</string>
     <key>InputMethodServerControllerClass</key>
-    <string>TalkmanInputController</string>
+    <string>StenoteInputController</string>
     <key>ComponentInputModeDict</key>
     <dict>
         <key>tsInputModeListKey</key>
         <dict>
-            <key>com.youngpilot.Talkman.inputmode</key>
+            <key>com.youngpilot.Stenote.inputmode</key>
             <dict>
                 <key>TISInputSourceIsEnabled</key>
                 <true/>
@@ -37,7 +37,7 @@
                 <key>TISInputSourceType</key>
                 <string>TISTypeKeyboardInputMode</string>
                 <key>InputSourceNonLocalizedName</key>
-                <string>Talkman</string>
+                <string>Stenote</string>
             </dict>
         </dict>
     </dict>

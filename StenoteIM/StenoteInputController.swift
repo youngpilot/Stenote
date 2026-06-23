@@ -2,8 +2,8 @@ import AppKit
 import InputMethodKit
 
 // @objc name must match InputMethodServerControllerClass in Info.plist exactly.
-@objc(TalkmanInputController)
-final class TalkmanInputController: IMKInputController {
+@objc(StenoteInputController)
+final class StenoteInputController: IMKInputController {
 
     private var currentComposition = ""
 

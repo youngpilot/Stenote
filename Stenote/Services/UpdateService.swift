@@ -3,7 +3,7 @@ import Network
 import Observation
 import os
 
-private let logger = Logger(subsystem: "com.youngpilot.Talkman", category: "Updater")
+private let logger = Logger(subsystem: "com.youngpilot.Stenote", category: "Updater")
 
 /// Checks GitHub Releases for a newer build.
 ///
@@ -27,7 +27,7 @@ final class UpdateService {
     /// know whether a newer version exists — so the UI must not claim "up to date".
     private(set) var lastSuccess: Date?
 
-    private let repo = "youngpilot/Talkman"
+    private let repo = "youngpilot/Stenote"
     private let lastSuccessKey = "updateLastSuccess"
     private let nextEligibleKey = "updateNextEligible"
 

@@ -4,7 +4,7 @@ import Foundation
 import Observation
 import os
 
-private let logger = Logger(subsystem: "com.youngpilot.Talkman", category: "RecordingManager")
+private let logger = Logger(subsystem: "com.youngpilot.Stenote", category: "RecordingManager")
 
 @Observable
 @MainActor

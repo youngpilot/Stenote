@@ -3,7 +3,7 @@ import ApplicationServices
 import Observation
 import os
 
-private let logger = Logger(subsystem: "com.youngpilot.Talkman", category: "Output")
+private let logger = Logger(subsystem: "com.youngpilot.Stenote", category: "Output")
 
 enum InsertionMode: String, CaseIterable, Identifiable {
     case auto
@@ -36,7 +36,7 @@ final class OutputService {
     /// Saved clipboard contents to restore after paste
     private var savedPasteboardItems: [NSPasteboardItem]?
 
-    /// The last non-Talkman app that was frontmost
+    /// The last non-Stenote app that was frontmost
     private var previousApp: NSRunningApplication?
     private var activationObserver: Any?
 

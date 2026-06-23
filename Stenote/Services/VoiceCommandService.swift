@@ -1,5 +1,5 @@
 // VoiceCommandService.swift
-// Talkman — replaces spoken command phrases with text equivalents
+// Stenote — replaces spoken command phrases with text equivalents
 
 import Foundation
 import Observation

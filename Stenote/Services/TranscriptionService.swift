@@ -5,7 +5,7 @@ import NaturalLanguage
 import Observation
 import os
 
-private let logger = Logger(subsystem: "com.youngpilot.Talkman", category: "Transcription")
+private let logger = Logger(subsystem: "com.youngpilot.Stenote", category: "Transcription")
 
 @Observable
 @MainActor

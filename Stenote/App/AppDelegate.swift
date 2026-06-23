@@ -2,14 +2,14 @@ import AppKit
 import AVFoundation
 import os
 
-private let logger = Logger(subsystem: "com.youngpilot.Talkman", category: "AppDelegate")
+private let logger = Logger(subsystem: "com.youngpilot.Stenote", category: "AppDelegate")
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var rightClickMonitor: Any?
     private var windowObserver: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        logger.info("Talkman launching...")
+        logger.info("Stenote launching...")
         requestMicrophonePermission()
         requestAccessibilityPermission()
         installRightClickMonitor()

@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A10001000000000000000001 /* TalkmanApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000001 /* TalkmanApp.swift */; };
+		A10001000000000000000001 /* StenoteApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000001 /* StenoteApp.swift */; };
 		A10001000000000000000002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000002 /* AppDelegate.swift */; };
 		A10001000000000000000004 /* AudioCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000004 /* AudioCaptureService.swift */; };
 		A10001000000000000000005 /* TranscriptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000005 /* TranscriptionService.swift */; };
@@ -29,7 +29,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		A10002000000000000000001 /* TalkmanApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TalkmanApp.swift; sourceTree = "<group>"; };
+		A10002000000000000000001 /* StenoteApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StenoteApp.swift; sourceTree = "<group>"; };
 		A10002000000000000000002 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		A10002000000000000000004 /* AudioCaptureService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioCaptureService.swift; sourceTree = "<group>"; };
 		A10002000000000000000005 /* TranscriptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionService.swift; sourceTree = "<group>"; };
@@ -45,8 +45,8 @@
 		A10002000000000000000016 /* HistoryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryService.swift; sourceTree = "<group>"; };
 		A10002000000000000000017 /* SystemAudioService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioService.swift; sourceTree = "<group>"; };
 		A10002000000000000000099 /* UpdateService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateService.swift; sourceTree = "<group>"; };
-		A10002000000000000000018 /* Talkman.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Talkman.entitlements; sourceTree = "<group>"; };
-		A10003000000000000000001 /* Talkman.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Talkman.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10002000000000000000018 /* Stenote.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Stenote.entitlements; sourceTree = "<group>"; };
+		A10003000000000000000001 /* Stenote.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Stenote.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A5178128DCCD441D8396BC03 /* VoiceCommandService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCommandService.swift; sourceTree = "<group>"; };
 		1EFC8E0F196644678C25C326 /* RingBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RingBuffer.swift; sourceTree = "<group>"; };
 		241AD4F7F22E4384AD139523 /* WaveformView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaveformView.swift; sourceTree = "<group>"; };
@@ -66,7 +66,7 @@
 		A10005000000000000000001 /* Root */ = {
 			isa = PBXGroup;
 			children = (
-				A10005000000000000000002 /* Talkman */,
+				A10005000000000000000002 /* Stenote */,
 				A10005000000000000000099 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -74,12 +74,12 @@
 		A10005000000000000000099 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A10003000000000000000001 /* Talkman.app */,
+				A10003000000000000000001 /* Stenote.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		A10005000000000000000002 /* Talkman */ = {
+		A10005000000000000000002 /* Stenote */ = {
 			isa = PBXGroup;
 			children = (
 				A10005000000000000000003 /* App */,
@@ -88,15 +88,15 @@
 				A10005000000000000000006 /* Views */,
 				A10005000000000000000007 /* Resources */,
 				A10002000000000000000013 /* Assets.xcassets */,
-				A10002000000000000000018 /* Talkman.entitlements */,
+				A10002000000000000000018 /* Stenote.entitlements */,
 			);
-			path = Talkman;
+			path = Stenote;
 			sourceTree = "<group>";
 		};
 		A10005000000000000000003 /* App */ = {
 			isa = PBXGroup;
 			children = (
-				A10002000000000000000001 /* TalkmanApp.swift */,
+				A10002000000000000000001 /* StenoteApp.swift */,
 				A10002000000000000000002 /* AppDelegate.swift */,
 			);
 			path = App;
@@ -149,9 +149,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		A10006000000000000000001 /* Talkman */ = {
+		A10006000000000000000001 /* Stenote */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = A10008000000000000000003 /* Build configuration list for PBXNativeTarget "Talkman" */;
+			buildConfigurationList = A10008000000000000000003 /* Build configuration list for PBXNativeTarget "Stenote" */;
 			buildPhases = (
 				A10007000000000000000001 /* Sources */,
 				A10004000000000000000001 /* Frameworks */,
@@ -161,12 +161,12 @@
 			);
 			dependencies = (
 			);
-			name = Talkman;
+			name = Stenote;
 			packageProductDependencies = (
 				A1000B000000000000000001 /* FluidAudio */,
 			);
-			productName = Talkman;
-			productReference = A10003000000000000000001 /* Talkman.app */;
+			productName = Stenote;
+			productReference = A10003000000000000000001 /* Stenote.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -184,7 +184,7 @@
 					};
 				};
 			};
-			buildConfigurationList = A10008000000000000000001 /* Build configuration list for PBXProject "Talkman" */;
+			buildConfigurationList = A10008000000000000000001 /* Build configuration list for PBXProject "Stenote" */;
 			compatibilityVersion = "Xcode 15.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -200,7 +200,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				A10006000000000000000001 /* Talkman */,
+				A10006000000000000000001 /* Stenote */,
 			);
 		};
 /* End PBXProject section */
@@ -221,7 +221,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A10001000000000000000001 /* TalkmanApp.swift in Sources */,
+				A10001000000000000000001 /* StenoteApp.swift in Sources */,
 				A10001000000000000000002 /* AppDelegate.swift in Sources */,
 				A10001000000000000000004 /* AudioCaptureService.swift in Sources */,
 				A10001000000000000000005 /* TranscriptionService.swift in Sources */,
@@ -367,18 +367,18 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = Talkman/Talkman.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Stenote/Stenote.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = 5A4T37N77V;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Talkman needs Automation access to detect if music is playing, so it can pause during recording and resume when you stop.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Talkman uses your microphone to transcribe speech into text locally on your device. Audio never leaves your Mac.";
-				MARKETING_VERSION = 0.7.3;
-				PRODUCT_BUNDLE_IDENTIFIER = com.youngpilot.Talkman;
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Stenote needs Automation access to detect if music is playing, so it can pause during recording and resume when you stop.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Stenote uses your microphone to transcribe speech into text locally on your device. Audio never leaves your Mac.";
+				MARKETING_VERSION = 0.8.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.youngpilot.Stenote;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
@@ -389,18 +389,18 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = Talkman/Talkman.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Stenote/Stenote.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = 5A4T37N77V;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Talkman needs Automation access to detect if music is playing, so it can pause during recording and resume when you stop.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Talkman uses your microphone to transcribe speech into text locally on your device. Audio never leaves your Mac.";
-				MARKETING_VERSION = 0.7.3;
-				PRODUCT_BUNDLE_IDENTIFIER = com.youngpilot.Talkman;
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Stenote needs Automation access to detect if music is playing, so it can pause during recording and resume when you stop.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Stenote uses your microphone to transcribe speech into text locally on your device. Audio never leaves your Mac.";
+				MARKETING_VERSION = 0.8.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.youngpilot.Stenote;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
@@ -410,7 +410,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		A10008000000000000000001 /* Build configuration list for PBXProject "Talkman" */ = {
+		A10008000000000000000001 /* Build configuration list for PBXProject "Stenote" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A10008000000000000000010 /* Debug */,
@@ -419,7 +419,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		A10008000000000000000003 /* Build configuration list for PBXNativeTarget "Talkman" */ = {
+		A10008000000000000000003 /* Build configuration list for PBXNativeTarget "Stenote" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A10008000000000000000020 /* Debug */,

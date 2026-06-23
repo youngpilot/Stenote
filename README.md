@@ -1,18 +1,18 @@
 <p align="center">
-  <img src="assets/feature.png" alt="Talkman" width="640">
+  <img src="assets/feature.png" alt="Stenote" width="640">
 </p>
 
-# Talkman
+# Stenote
 
 **The voice-to-text app macOS should have built in.**
 
 _Free for private use · 100% on-device · no cloud, no API keys._
 
-Talkman is a native menubar app that turns your voice into text in any app. Speak, stop, and your words land at the cursor — everything runs on your Mac. Built on [NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) on the Apple Neural Engine (via the [FluidAudio SDK](https://github.com/FluidInference/FluidAudio)): faster than real-time, low hallucination, and 25 European languages auto-detected — and freely mixable in a single sentence (English plus your native language, or any combination).
+Stenote is a native menubar app that turns your voice into text in any app. Speak, stop, and your words land at the cursor — everything runs on your Mac. Built on [NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) on the Apple Neural Engine (via the [FluidAudio SDK](https://github.com/FluidInference/FluidAudio)): faster than real-time, low hallucination, and 25 European languages auto-detected — and freely mixable in a single sentence (English plus your native language, or any combination).
 
-## How Talkman compares
+## How Stenote compares
 
-| | Talkman | Apple Dictation | Wispr Flow | Whisper apps¹ |
+| | Stenote | Apple Dictation | Wispr Flow | Whisper apps¹ |
 |---|---|---|---|---|
 | **Compute** | 🟢 On-device (ANE) | 🟢 On-device | 🔴 Cloud | 🟢 On-device |
 | **Privacy** | 🟢 Never leaves your Mac | 🟢 On device | 🔴 Audio uploaded | 🟢 On device |
@@ -25,7 +25,7 @@ Talkman is a native menubar app that turns your voice into text in any app. Spea
 
 ¹ superwhisper, MacWhisper.  ·  Legend: 🟢 strength · 🟡 mixed · 🔴 limiting
 
-In short: Apple Dictation is private but weak, Wispr Flow is polished but cloud and paid, Whisper apps are local but heavier and hallucination-prone. Talkman is private, local, accurate, and free — without the trade-off.
+In short: Apple Dictation is private but weak, Wispr Flow is polished but cloud and paid, Whisper apps are local but heavier and hallucination-prone. Stenote is private, local, accurate, and free — without the trade-off.
 
 ## Features
 
@@ -47,8 +47,8 @@ English, German, French, Spanish, Italian, Portuguese, Dutch, Polish, Czech, Rom
 
 ## Install
 
-1. Download `Talkman-0.7.3.dmg` from the [latest release](https://github.com/youngpilot/Talkman/releases/latest).
-2. Open it, drag **Talkman** to Applications, and launch.
+1. Download `Stenote-0.7.3.dmg` from the [latest release](https://github.com/youngpilot/Stenote/releases/latest).
+2. Open it, drag **Stenote** to Applications, and launch.
 3. Grant **Microphone** and **Accessibility** when prompted. The speech model (~460 MB) downloads once, then runs fully offline.
 
 Requires **macOS 15.2+** and **Apple Silicon** (M1 or later).
@@ -60,7 +60,7 @@ Requires **macOS 15.2+** and **Apple Silicon** (M1 or later).
 Double-press **Right ⌥** to start, speak, then press again — or let it auto-stop after silence — and the text lands wherever your cursor is. Left-click the menubar icon for settings; the icon turns red while recording.
 
 <p align="center">
-  <img src="assets/screenshot-main.png" alt="Talkman menu" width="340">
+  <img src="assets/screenshot-main.png" alt="Stenote menu" width="340">
 </p>
 
 ## Build from source
@@ -69,12 +69,12 @@ Swift 6 + SwiftUI. Requires **Xcode 16+** (developed on 26.5) and Apple Silicon.
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-  xcodebuild -project Talkman.xcodeproj -scheme Talkman -configuration Debug build
+  xcodebuild -project Stenote.xcodeproj -scheme Stenote -configuration Debug build
 ```
 
 The FluidAudio package resolves automatically; models download on first launch. For a signed build, set your own Apple Developer Team in *Signing & Capabilities*.
 
-> `TalkmanIM/` is an experimental, not-yet-wired-in system-wide input method — optional, not needed to build or run Talkman.
+> `StenoteIM/` is an experimental, not-yet-wired-in system-wide input method — optional, not needed to build or run Stenote.
 
 ## Credits
 

@@ -1,31 +1,31 @@
 #!/usr/bin/env bash
-# Build TalkmanIM input method extension and install to ~/Library/Input Methods/
+# Build StenoteIM input method extension and install to ~/Library/Input Methods/
 # Usage: bash scripts/build-ime.sh [--notarize]
 #   --notarize  Sign with Developer ID, submit for notarization, and staple.
 #               Required for Gatekeeper to accept the IME on macOS 14+.
-#               Without this flag, run: sudo spctl --add ~/Library/Input\ Methods/TalkmanIM.app
+#               Without this flag, run: sudo spctl --add ~/Library/Input\ Methods/StenoteIM.app
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-SRC_DIR="$PROJECT_DIR/TalkmanIM"
+SRC_DIR="$PROJECT_DIR/StenoteIM"
 BUILD_DIR="$PROJECT_DIR/.build-ime"
-APP_BUNDLE="$BUILD_DIR/TalkmanIM.app"
+APP_BUNDLE="$BUILD_DIR/StenoteIM.app"
 INSTALL_DIR="$HOME/Library/Input Methods"
-INSTALLED_APP="$INSTALL_DIR/TalkmanIM.app"
+INSTALLED_APP="$INSTALL_DIR/StenoteIM.app"
 
-BUNDLE_ID="com.youngpilot.Talkman.InputMethod"
-EXECUTABLE="TalkmanIM"
-TEAM_ID="${TALKMAN_TEAM_ID:?Set TALKMAN_TEAM_ID env var (your Apple Developer Team ID, e.g. ABCDE12345)}"
-SIGNER="Developer ID Application: ${TALKMAN_SIGNER_NAME:?Set TALKMAN_SIGNER_NAME env var (e.g. 'Your Name')} ($TEAM_ID)"
+BUNDLE_ID="com.youngpilot.Stenote.InputMethod"
+EXECUTABLE="StenoteIM"
+TEAM_ID="${STENOTE_TEAM_ID:?Set STENOTE_TEAM_ID env var (your Apple Developer Team ID, e.g. ABCDE12345)}"
+SIGNER="Developer ID Application: ${STENOTE_SIGNER_NAME:?Set STENOTE_SIGNER_NAME env var (e.g. 'Your Name')} ($TEAM_ID)"
 
 NOTARIZE=false
 for arg in "$@"; do
     [[ "$arg" == "--notarize" ]] && NOTARIZE=true
 done
 
-echo "==> Building TalkmanIM..."
+echo "==> Building StenoteIM..."
 
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
@@ -33,7 +33,7 @@ mkdir -p "$BUILD_DIR"
 SOURCES=(
     "$SRC_DIR/main.swift"
     "$SRC_DIR/NotificationBridge.swift"
-    "$SRC_DIR/TalkmanInputController.swift"
+    "$SRC_DIR/StenoteInputController.swift"
 )
 
 swiftc \
@@ -57,11 +57,11 @@ if $NOTARIZE; then
     codesign --force --deep \
         --sign "$SIGNER" \
         --options runtime \
-        --entitlements "$SRC_DIR/TalkmanIM.entitlements" \
+        --entitlements "$SRC_DIR/StenoteIM.entitlements" \
         "$APP_BUNDLE"
 
     echo "==> Notarizing..."
-    ZIP_PATH="$BUILD_DIR/TalkmanIM.zip"
+    ZIP_PATH="$BUILD_DIR/StenoteIM.zip"
     ditto -c -k --keepParent "$APP_BUNDLE" "$ZIP_PATH"
     xcrun notarytool submit "$ZIP_PATH" --keychain-profile notary --wait
     xcrun stapler staple "$APP_BUNDLE"
@@ -71,13 +71,13 @@ else
     codesign --force --deep \
         --sign "$SIGNER" \
         --options runtime \
-        --entitlements "$SRC_DIR/TalkmanIM.entitlements" \
+        --entitlements "$SRC_DIR/StenoteIM.entitlements" \
         "$APP_BUNDLE"
 fi
 
 echo "==> Installing to ~/Library/Input Methods/..."
-if pgrep -f "TalkmanIM" &>/dev/null; then
-    pkill -f "TalkmanIM" || true
+if pgrep -f "StenoteIM" &>/dev/null; then
+    pkill -f "StenoteIM" || true
     sleep 0.5
 fi
 
@@ -105,6 +105,6 @@ fi
 
 echo ""
 echo "Done. After Gatekeeper approval:"
-echo "  1. System Settings → Keyboard → Input Sources → '+' → add Talkman"
-echo "  2. Switch to Talkman input source in any text field"
+echo "  1. System Settings → Keyboard → Input Sources → '+' → add Stenote"
+echo "  2. Switch to Stenote input source in any text field"
 echo "  3. Test: swift scripts/test-ime.swift"
