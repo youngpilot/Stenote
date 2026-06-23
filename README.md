@@ -8,7 +8,7 @@
 
 _Free for private use · 100% on-device · no cloud, no API keys._
 
-Talkman is a native menubar app that turns your voice into text in any app. Speak, stop, and your words land at the cursor — everything runs on your Mac. Built on [NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) on the Apple Neural Engine (via the [FluidAudio SDK](https://github.com/FluidInference/FluidAudio)): faster than real-time, low hallucination, and 25 European languages auto-detected — even mixed in one sentence.
+Talkman is a native menubar app that turns your voice into text in any app. Speak, stop, and your words land at the cursor — everything runs on your Mac. Built on [NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) on the Apple Neural Engine (via the [FluidAudio SDK](https://github.com/FluidInference/FluidAudio)): faster than real-time, low hallucination, and 25 European languages auto-detected — and freely mixable in a single sentence (English plus your native language, or any combination).
 
 ## How Talkman compares
 
@@ -30,7 +30,7 @@ In short: Apple Dictation is private but weak, Wispr Flow is polished but cloud 
 ## Features
 
 - **Accuracy-first** — transcribes your full utterance on continuous context, then inserts it when you stop.
-- **25 languages, auto-detected** — no switching, even mixing German and English mid-sentence.
+- **25 languages, auto-detected** — no switching, and you can mix any of them mid-sentence (e.g. English plus your native language).
 - **Global hotkey** — double-press Right ⌥ by default (also Right ⌘, ⌥+Space, Fn+Space, F5, Fn/🌐; several can be active at once). Right-click the menubar icon to toggle.
 - **Mute & pause media** — independently mute system audio and/or pause Spotify & Apple Music while recording (both on by default).
 - **Word corrections** — custom replacements for names and jargon, with optional model boosting.
