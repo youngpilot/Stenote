@@ -6,6 +6,8 @@
 
 **The voice-to-text app macOS should have built in.**
 
+_Free for private use · 100% on-device · no cloud, no API keys._
+
 Talkman is a native menubar app that transcribes your voice in real time — directly into whatever app you're working in. No cloud. No API keys. No latency. Just speak and watch text appear instantly.
 
 Built on [NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3), running entirely on-device via Apple Neural Engine through [FluidAudio SDK](https://github.com/AntAudioIntelligence/FluidAudio). Transcription runs at **~120x real-time on M4 Pro** — faster than you can speak.
@@ -125,4 +127,6 @@ The `TalkmanIM/` directory contains a work-in-progress system-wide **input metho
 
 ## License
 
-MIT
+**Talkman is free for private use.** It is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE) — you may use, modify, and share it for any noncommercial purpose (personal use, hobby projects, study, and noncommercial organizations). Commercial use is not permitted.
+
+Copyright © 2026 Julian Schiemann.
