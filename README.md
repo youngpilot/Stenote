@@ -38,6 +38,7 @@ In short: Apple Dictation is private but weak, Wispr Flow is polished but cloud 
 - **Smart clipboard** — uses a concealed type so clipboard managers ignore pastes, and restores your clipboard afterward.
 - **Also** — auto-stop on silence, paragraph breaks, prefix/suffix text, launch at login, menubar-only (no dock icon).
 - **Updates** — *Manual* (no network calls, the default) or *Daily* (one lightweight GitHub check). No account, no telemetry.
+- **Guided setup** — a first-run welcome covers permissions, your shortcut, and preferences in a few steps.
 
 <details><summary>All 25 languages</summary>
 
@@ -47,7 +48,7 @@ English, German, French, Spanish, Italian, Portuguese, Dutch, Polish, Czech, Rom
 
 ## Install
 
-1. Download `Stenote-0.7.3.dmg` from the [latest release](https://github.com/youngpilot/Stenote/releases/latest).
+1. Download `Stenote-0.8.1.dmg` from the [latest release](https://github.com/youngpilot/Stenote/releases/latest).
 2. Open it, drag **Stenote** to Applications, and launch.
 3. Grant **Microphone** and **Accessibility** when prompted. The speech model (~460 MB) downloads once, then runs fully offline.
 
@@ -59,9 +60,7 @@ Requires **macOS 15.2+** and **Apple Silicon** (M1 or later).
 
 Double-press **Right ⌥** to start, speak, then press again — or let it auto-stop after silence — and the text lands wherever your cursor is. Left-click the menubar icon for settings; the icon turns red while recording.
 
-<p align="center">
-  <img src="assets/screenshot-main.png" alt="Stenote menu" width="340">
-</p>
+A short welcome on first launch walks you through permissions, your shortcut, and a few preferences.
 
 ## Build from source
 
