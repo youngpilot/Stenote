@@ -13,7 +13,6 @@ final class TranscriptionService {
     private(set) var isModelLoaded = false
     private(set) var isTranscribing = false
     private(set) var currentText = ""
-    private(set) var segments: [TranscriptionSegment] = []
     private(set) var modelLoadingStep = ""
 
     private let textReplacement = TextReplacementService.shared
@@ -21,29 +20,19 @@ final class TranscriptionService {
 
     // Shared FluidAudio components
     private var asrModels: UncheckedSendableBox<AsrModels>?
-    private var asrBox: UncheckedSendableBox<AsrManager>?  // For Live mode
-    private var streamingAsr: StreamingAsrManager?          // For Accurate mode
+    private var streamingAsr: StreamingAsrManager?
     private var vadManager: VadManager?
     private var ctcBox: UncheckedSendableBox<CtcModels>?
 
-    private var asrManager: AsrManager? { asrBox?.value }
     private var ctcModels: CtcModels? { ctcBox?.value }
 
-    // Which mode is active for current session
-    private var activeMode: TranscriptionMode = .live
-
-    // --- Live mode state ---
-    private var accumulatedSamples: [Float] = []
-    private let periodicInterval: TimeInterval = 3.0
-    private var lastTranscriptionTime: Date?
-    private var isTranscribing_ASR = false
-
-    // --- Accurate mode state ---
-    private var lastConfirmedText = ""  // used for volatile preview diff
+    // --- Streaming state ---
+    private var lastConfirmedText = ""      // used for volatile preview diff
+    private var lastPastedConfirmedText = "" // delta tracking for incremental paste
     private var updateTask: Task<Void, Never>?
-    private var isStopping = false      // guard against stale updates during finish()
+    private var isStopping = false          // guard against stale updates during finish()
 
-    // --- Shared VAD state ---
+    // --- VAD state (auto-stop + paragraph breaks) ---
     private var vadBuffer: [Float] = []
     private var vadStreamState: VadStreamState = .initial()
     private var lastSpeechTime: Date?
@@ -54,12 +43,8 @@ final class TranscriptionService {
     private(set) var detectedLanguage = ""
     // Confidence tracking
     private(set) var lastConfidence: Float = 0
-    private(set) var lastRtfx: Float = 0
     private(set) var minTokenConfidence: Float = 0
     private(set) var avgTokenConfidence: Float = 0
-
-    // Streaming paste tracking
-    private var lastPastedConfirmedText = ""
 
     var onSegmentReady: ((String) -> Void)?
     var onSilenceTimeout: (() -> Void)?
@@ -71,23 +56,12 @@ final class TranscriptionService {
         let models = try await AsrModels.downloadAndLoad(version: .v3)
         asrModels = UncheckedSendableBox(models)
 
-        // Initialize batch ASR manager with tuned TDT config (used in Live mode)
-        modelLoadingStep = "Initializing ASR engine… (2/3)"
-        let tdtConfig = TdtConfig(
-            boundarySearchFrames: 30,    // Default 20 — more search at chunk edges
-            maxTokensPerChunk: 200,      // Default 150 — allow longer chunks
-            consecutiveBlankLimit: 8     // Default 5 — less aggressive termination
-        )
-        let asrConfig = ASRConfig(tdtConfig: tdtConfig)
-        let manager = AsrManager(config: asrConfig)
-        try await manager.initialize(models: models)
-        asrBox = UncheckedSendableBox(manager)
-
-        // Initialize VAD
-        modelLoadingStep = "Loading VAD model… (3/3)"
+        // VAD powers auto-stop and paragraph-break detection
+        modelLoadingStep = "Loading VAD model… (2/3)"
         vadManager = try await VadManager()
 
-        // Download CTC models for vocabulary boosting
+        // CTC models power optional vocabulary boosting
+        modelLoadingStep = "Loading vocabulary model… (3/3)"
         ctcBox = UncheckedSendableBox(try await CtcModels.downloadAndLoad())
 
         modelLoadingStep = ""
@@ -95,31 +69,6 @@ final class TranscriptionService {
     }
 
     // MARK: - Vocabulary Boosting
-
-    func configureVocabularyBoosting() async {
-        guard let asrBox, let ctcBox else { return }
-
-        guard SettingsStore.shared.enableVocabBoosting else {
-            asrBox.value.disableVocabularyBoosting()
-            return
-        }
-
-        let terms = buildVocabularyTerms()
-        guard !terms.isEmpty else {
-            asrBox.value.disableVocabularyBoosting()
-            return
-        }
-
-        let vocabContext = CustomVocabularyContext(terms: terms)
-        do {
-            try await asrBox.value.configureVocabularyBoosting(
-                vocabulary: vocabContext,
-                ctcModels: ctcBox.value
-            )
-        } catch {
-            logger.warning("Vocabulary boosting setup failed: \(error)")
-        }
-    }
 
     private func buildVocabularyTerms() -> [CustomVocabularyTerm] {
         let brandNames = textReplacement.replacements
@@ -140,11 +89,8 @@ final class TranscriptionService {
     func startTranscription() async {
         guard isModelLoaded else { return }
 
-        activeMode = SettingsStore.shared.transcriptionMode
-
-        // Reset shared state
+        // Reset state
         currentText = ""
-        segments = []
         vadBuffer = []
         vadStreamState = .initial()
         lastSpeechTime = Date()
@@ -152,24 +98,14 @@ final class TranscriptionService {
         pendingParagraphBreak = false
         detectedLanguage = ""
 
-        if activeMode == .accurate {
-            await startAccurateMode()
-        } else {
-            startLiveMode()
-        }
+        await startStreaming()
 
         isTranscribing = true
     }
 
     func stopTranscription() async -> String {
         guard isTranscribing else { return currentText }
-
-        if activeMode == .accurate {
-            await stopAccurateMode()
-        } else {
-            await stopLiveMode()
-        }
-
+        await stopStreaming()
         isTranscribing = false
         return currentText
     }
@@ -179,38 +115,22 @@ final class TranscriptionService {
     func processAudioBuffer(_ buffer: AVAudioPCMBuffer) async {
         guard isTranscribing else { return }
 
-        if activeMode == .accurate {
-            // Feed to streaming ASR
-            if let asr = streamingAsr {
-                nonisolated(unsafe) let sendableBuffer = buffer
-                await asr.streamAudio(sendableBuffer)
-            }
+        // Feed the streaming ASR engine
+        if let asr = streamingAsr {
+            nonisolated(unsafe) let sendableBuffer = buffer
+            await asr.streamAudio(sendableBuffer)
         }
 
-        // Extract samples for VAD + Live mode
+        // Extract samples for VAD (auto-stop + paragraph breaks)
         guard let channelData = buffer.floatChannelData else { return }
         let count = Int(buffer.frameLength)
         guard count > 0 else { return }
         let samples = Array(UnsafeBufferPointer(start: channelData[0], count: count))
 
-        if activeMode == .live {
-            accumulatedSamples.append(contentsOf: samples)
-        }
-
         await processVadSamples(samples)
-
-        // Live mode: periodic transcription fallback
-        if activeMode == .live {
-            if !isTranscribing_ASR,
-               accumulatedSamples.count >= 16_000,
-               let lastTime = lastTranscriptionTime,
-               Date().timeIntervalSince(lastTime) >= periodicInterval {
-                await transcribeAccumulatedLive(isMidSpeech: true)
-            }
-        }
     }
 
-    // MARK: - VAD Processing (shared)
+    // MARK: - VAD Processing
 
     private func processVadSamples(_ samples: [Float]) async {
         guard let vadManager else { return }
@@ -250,10 +170,6 @@ final class TranscriptionService {
                         }
                     case .speechEnd:
                         lastSpeechEndTime = Date()
-                        // Live mode: transcribe on speech end
-                        if activeMode == .live {
-                            await transcribeAccumulatedLive()
-                        }
                     }
                 }
 
@@ -271,101 +187,9 @@ final class TranscriptionService {
         }
     }
 
-    // MARK: - Live Mode
+    // MARK: - Streaming Transcription
 
-    private func startLiveMode() {
-        accumulatedSamples = []
-        lastTranscriptionTime = Date()
-        isTranscribing_ASR = false
-
-        // Reconfigure vocab boosting on the batch ASR manager
-        Task { await configureVocabularyBoosting() }
-    }
-
-    private func stopLiveMode() async {
-        // Wait for any in-flight transcription to complete before transcribing
-        // remaining audio. Without this, resetting isTranscribing_ASR while a
-        // transcription is awaiting allows two concurrent calls → duplicate text.
-        for _ in 0..<100 { // max ~1s
-            if !isTranscribing_ASR { break }
-            try? await Task.sleep(for: .milliseconds(10))
-        }
-
-        // Flush remaining VAD buffer into accumulated
-        if !vadBuffer.isEmpty {
-            accumulatedSamples.append(contentsOf: vadBuffer)
-            vadBuffer = []
-        }
-
-        // Transcribe ALL remaining audio — never discard
-        if !accumulatedSamples.isEmpty {
-            let minSamples = 8_000
-            if accumulatedSamples.count < minSamples {
-                accumulatedSamples.append(contentsOf: [Float](repeating: 0, count: minSamples - accumulatedSamples.count))
-            }
-            await transcribeAccumulatedLive()
-        }
-    }
-
-    private func transcribeAccumulatedLive(isMidSpeech: Bool = false) async {
-        guard !accumulatedSamples.isEmpty, let asrBox, !isTranscribing_ASR else { return }
-        guard accumulatedSamples.count >= 8_000 else { return }
-
-        isTranscribing_ASR = true
-        defer { isTranscribing_ASR = false }
-
-        let samplesToTranscribe = accumulatedSamples
-        accumulatedSamples = []
-        lastTranscriptionTime = Date()
-
-        do {
-            let result = try await asrBox.value.transcribe(samplesToTranscribe, source: .microphone)
-            lastConfidence = result.confidence
-            lastRtfx = result.rtfx
-            let rawText = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !rawText.isEmpty else { return }
-
-            var corrected = textReplacement.applyReplacements(to: rawText)
-
-            // Strip trailing punctuation from mid-speech chunks
-            if isMidSpeech {
-                while corrected.last == "." || corrected.last == "?" || corrected.last == "!" {
-                    corrected.removeLast()
-                }
-                corrected = corrected.trimmingCharacters(in: .whitespaces)
-                guard !corrected.isEmpty else { return }
-            }
-
-            corrected = removeTrailingStutter(corrected)
-            corrected = voiceCommands.process(corrected)
-
-            // Detect language
-            let recognizer = NLLanguageRecognizer()
-            recognizer.processString(corrected)
-            if let lang = recognizer.dominantLanguage?.rawValue {
-                detectedLanguage = String(lang.prefix(2))
-            }
-
-            let segment = TranscriptionSegment(
-                text: corrected,
-                timestamp: Date(),
-                language: detectedLanguage.isEmpty ? nil : detectedLanguage,
-                isFinal: true
-            )
-            segments.append(segment)
-            currentText = segments.map(\.text).joined(separator: " ")
-
-            let prefix = pendingParagraphBreak ? "\n\n" : ""
-            pendingParagraphBreak = false
-            onSegmentReady?(prefix + corrected)
-        } catch {
-            logger.error("Transcription error: \(error)")
-        }
-    }
-
-    // MARK: - Accurate Mode
-
-    private func startAccurateMode() async {
+    private func startStreaming() async {
         guard let asrModels else { return }
 
         lastConfirmedText = ""
@@ -376,16 +200,16 @@ final class TranscriptionService {
 
         // Tuned config: faster confirmations, more context, lower latency
         let config = StreamingAsrConfig(
-            chunkSeconds: 11.0,              // Keep — good tradeoff for TDT batch model
-            hypothesisChunkSeconds: 0.5,     // ↓ from 1.0 — faster preview updates
-            leftContextSeconds: 3.0,         // ↑ from 2.0 — better accuracy at chunk edges
-            rightContextSeconds: 1.5,        // ↓ from 2.0 — 0.5s less latency
-            minContextForConfirmation: 5.0,  // ↓ from 10.0 — confirm text 5s earlier
-            confirmationThreshold: 0.85      // ↑ from 0.80 — stricter to compensate
+            chunkSeconds: 11.0,              // Good tradeoff for the TDT batch model
+            hypothesisChunkSeconds: 0.5,     // Faster preview updates
+            leftContextSeconds: 3.0,         // Better accuracy at chunk edges
+            rightContextSeconds: 1.5,        // 0.5s less latency
+            minContextForConfirmation: 5.0,  // Confirm text ~5s after speech
+            confirmationThreshold: 0.85      // Stricter to compensate for less context
         )
         let asr = StreamingAsrManager(config: config)
 
-        // Configure vocabulary boosting on streaming manager
+        // Optional vocabulary boosting (off by default)
         if SettingsStore.shared.enableVocabBoosting, let ctcModels {
             let terms = buildVocabularyTerms()
             if !terms.isEmpty {
@@ -419,13 +243,13 @@ final class TranscriptionService {
         }
     }
 
-    private func stopAccurateMode() async {
+    private func stopStreaming() async {
         // Block stale updates from overwriting currentText during finish()
         isStopping = true
         updateTask?.cancel()
         updateTask = nil
 
-        logger.info("stopAccurateMode: lastConfirmedText=\(self.lastConfirmedText.count) chars")
+        logger.info("stopStreaming: lastConfirmedText=\(self.lastConfirmedText.count) chars")
 
         if let asr = streamingAsr {
             do {
@@ -448,7 +272,7 @@ final class TranscriptionService {
 
                     // Only paste the delta not yet pasted during streaming
                     let delta = computeConfirmedDelta(old: lastPastedConfirmedText, new: corrected)
-                    logger.info("Accurate finish (\(corrected.count) chars, delta: \(delta.count)): \(corrected.prefix(120))…")
+                    logger.info("finish (\(corrected.count) chars, delta: \(delta.count)): \(corrected.prefix(120))…")
                     if !delta.isEmpty {
                         let prefix = pendingParagraphBreak ? "\n\n" : ""
                         pendingParagraphBreak = false

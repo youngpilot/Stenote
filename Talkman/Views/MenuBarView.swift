@@ -760,33 +760,6 @@ private struct InlineSettingsView: View {
 
             // Recording
             SettingsCard(title: "Recording", isExpanded: expandedSection == "Recording", onToggle: { toggleSection("Recording") }) {
-                settingsRow("Mode") {
-                    Picker("", selection: Binding(
-                        get: { settings.transcriptionMode },
-                        set: { settings.transcriptionMode = $0 }
-                    )) {
-                        ForEach(TranscriptionMode.allCases) { mode in
-                            Text(mode.label).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .fixedSize()
-                }
-
-                if settings.transcriptionMode == .live {
-                    Label("Accuracy is reduced.", systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
-                        .font(labelFont)
-                    Text("Text appears as you speak, phrase by phrase.")
-                        .font(labelFont)
-                        .foregroundStyle(.tertiary)
-                } else {
-                    Text("Text appears as confirmed. Max accuracy.")
-                        .font(labelFont)
-                        .foregroundStyle(.tertiary)
-                }
-
                 settingsRow("Media Playback") {
                     Picker("", selection: Binding(
                         get: { settings.mediaPlaybackOption },

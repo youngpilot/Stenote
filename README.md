@@ -44,10 +44,12 @@ Talkman works in **any text field, in any app** — your editor, browser, termin
 
 ## Install
 
-1. Download `Talkman-0.5.2.dmg` from the [latest release](https://github.com/youngpilot/Talkman/releases/latest)
+1. Download `Talkman-0.7.0.dmg` from the [latest release](https://github.com/youngpilot/Talkman/releases/latest)
 2. Open the DMG and drag Talkman to Applications
 3. Launch Talkman — grant Microphone and Accessibility permissions when prompted
 4. The ASR model downloads automatically on first launch (~200MB)
+
+> If macOS says the app "cannot be opened because the developer cannot be verified," right-click the app → **Open** → **Open**. Released builds are notarized, so this only happens with copies you build yourself.
 
 Requires **macOS 15.2+** and **Apple Silicon** (M1 or later).
 
@@ -70,7 +72,7 @@ The mic icon turns red while recording.
 
 ## Features
 
-- **Two transcription modes** — *Accurate* (default): max accuracy, text appears after multiple sentences. *Live*: text appears phrase by phrase as you speak.
+- **Streaming transcription** — confirmed text is inserted incrementally as you speak, with maximum accuracy from continuous context.
 - **25 languages, auto-detected** — speak in any supported language and Talkman recognizes it automatically. No language switching needed.
 - **Menubar-only** — lives in your menu bar, no dock icon, no windows, out of your way
 - **Global hotkey** — double-press Right ⌥ to toggle recording (configurable: Right ⌘, ⌥ + Space, Fn + Space, F5, Fn/🌐 — multiple shortcuts can be active simultaneously)
@@ -94,7 +96,7 @@ The mic icon turns red while recording.
 ## Tech Stack
 
 - Swift 6 + SwiftUI
-- FluidAudio SDK 0.12.2 (Parakeet TDT v3 CoreML, Silero VAD, CTC vocabulary boosting)
+- FluidAudio SDK 0.13.0 (Parakeet TDT v3 CoreML, Silero VAD, CTC vocabulary boosting)
 - Apple Neural Engine for inference
 - AVAudioEngine for mic capture (16kHz mono)
 - CGEvent for paste simulation
@@ -102,11 +104,18 @@ The mic icon turns red while recording.
 
 ## Building from Source
 
+Requires **Xcode 16+** (developed on Xcode 26.5) and an Apple Silicon Mac.
+
 ```bash
-xcodebuild -project Talkman.xcodeproj -scheme Talkman -configuration Debug build
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+  xcodebuild -project Talkman.xcodeproj -scheme Talkman -configuration Debug build
 ```
 
-Models are downloaded automatically on first launch (~200MB).
+The first build resolves the FluidAudio Swift package automatically. To produce a signed build, set your own Apple Developer Team in Xcode (*Signing & Capabilities*) or override `DEVELOPMENT_TEAM`. Models are downloaded automatically on first launch (~200MB).
+
+## Experimental
+
+The `TalkmanIM/` directory contains a work-in-progress system-wide **input method extension** (an alternative to clipboard-paste insertion). It is **not yet wired into the app** and is not required to build or run Talkman — treat it as experimental. Build it standalone with `scripts/build-ime.sh` (requires your own Apple Developer signing identity).
 
 ## Credits
 

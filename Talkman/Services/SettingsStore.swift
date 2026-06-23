@@ -62,20 +62,6 @@ enum MediaPlaybackOption: String, CaseIterable, Identifiable {
     }
 }
 
-enum TranscriptionMode: String, CaseIterable, Identifiable {
-    case accurate = "accurate"
-    case live = "live"
-
-    var id: String { rawValue }
-
-    var label: String {
-        switch self {
-        case .live: "Live"
-        case .accurate: "Accurate"
-        }
-    }
-}
-
 enum HotkeyChoice: String, CaseIterable, Identifiable {
     case doubleRightOption = "doubleRightOption"
     case doubleRightCmd = "doubleRightCmd"
@@ -165,10 +151,6 @@ final class SettingsStore {
         didSet { UserDefaults.standard.set(enableVocabBoosting, forKey: "enableVocabBoosting") }
     }
 
-    var transcriptionMode: TranscriptionMode {
-        didSet { UserDefaults.standard.set(transcriptionMode.rawValue, forKey: "transcriptionMode") }
-    }
-
     var insertionMode: InsertionMode {
         didSet { UserDefaults.standard.set(insertionMode.rawValue, forKey: "insertionMode") }
     }
@@ -197,7 +179,6 @@ final class SettingsStore {
         autoStopTimeout = .thirty
         mediaPlaybackOption = .none
         enableVocabBoosting = false
-        transcriptionMode = .accurate
         insertionMode = .auto
         enableVoiceCommands = false
         historyPreviewLines = 3
@@ -226,7 +207,6 @@ final class SettingsStore {
         }()
         self.mediaPlaybackOption = MediaPlaybackOption(rawValue: ud.string(forKey: "mediaPlaybackOption") ?? "") ?? .none
         self.enableVocabBoosting = ud.object(forKey: "enableVocabBoosting") == nil ? false : ud.bool(forKey: "enableVocabBoosting")
-        self.transcriptionMode = TranscriptionMode(rawValue: ud.string(forKey: "transcriptionMode") ?? "") ?? .accurate
         self.insertionMode = InsertionMode(rawValue: ud.string(forKey: "insertionMode") ?? "") ?? .auto
         self.enableVoiceCommands = ud.bool(forKey: "enableVoiceCommands")
         self.historyPreviewLines = ud.object(forKey: "historyPreviewLines") == nil ? 3 : ud.integer(forKey: "historyPreviewLines")

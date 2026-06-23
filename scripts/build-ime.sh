@@ -17,8 +17,8 @@ INSTALLED_APP="$INSTALL_DIR/TalkmanIM.app"
 
 BUNDLE_ID="com.youngpilot.Talkman.InputMethod"
 EXECUTABLE="TalkmanIM"
-TEAM_ID="5A4T37N77V"
-SIGNER="Developer ID Application: Julian Schiemann ($TEAM_ID)"
+TEAM_ID="${TALKMAN_TEAM_ID:?Set TALKMAN_TEAM_ID env var (your Apple Developer Team ID, e.g. ABCDE12345)}"
+SIGNER="Developer ID Application: ${TALKMAN_SIGNER_NAME:?Set TALKMAN_SIGNER_NAME env var (e.g. 'Your Name')} ($TEAM_ID)"
 
 NOTARIZE=false
 for arg in "$@"; do
