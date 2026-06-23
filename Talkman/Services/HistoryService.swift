@@ -30,7 +30,6 @@ final class HistoryService {
     private(set) var totalRecordings: Int = 0
     private(set) var totalDuration: TimeInterval = 0
     private(set) var totalCharacters: Int = 0
-    private let maxEntries = 20
     private let storageKey = "transcriptionHistory"
 
     private init() {
@@ -49,8 +48,8 @@ final class HistoryService {
         let entry = HistoryEntry(text: trimmed, duration: duration, recordingId: totalRecordings)
         entries.insert(entry, at: 0)
 
-        if entries.count > maxEntries {
-            entries = Array(entries.prefix(maxEntries))
+        if let cap = SettingsStore.shared.historyLength.cap, entries.count > cap {
+            entries = Array(entries.prefix(cap))
         }
 
         // Update lifetime stats
@@ -72,6 +71,16 @@ final class HistoryService {
     func clearHistory() {
         entries = []
         saveToDefaults()
+    }
+
+    /// Trim stored entries to the current history-length setting. Call when the
+    /// setting changes (e.g. user lowers the limit or picks None).
+    func enforceLimit() {
+        guard let cap = SettingsStore.shared.historyLength.cap else { return }
+        if entries.count > cap {
+            entries = Array(entries.prefix(cap))
+            saveToDefaults()
+        }
     }
 
     private func loadFromDefaults() {

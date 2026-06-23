@@ -87,6 +87,34 @@ enum UpdateCheckMode: String, CaseIterable, Identifiable {
     }
 }
 
+enum HistoryLength: Int, CaseIterable, Identifiable {
+    case none = 0
+    case ten = 10
+    case twenty = 20
+    case fifty = 50
+    case hundred = 100
+    case unlimited = -1
+
+    var id: Int { rawValue }
+
+    var label: String {
+        switch self {
+        case .none: "None"
+        case .unlimited: "Unlimited"
+        default: "\(rawValue)"
+        }
+    }
+
+    /// Max entries to keep; nil = unlimited.
+    var cap: Int? {
+        switch self {
+        case .none: 0
+        case .unlimited: nil
+        default: rawValue
+        }
+    }
+}
+
 @Observable
 @MainActor
 final class SettingsStore {
@@ -164,6 +192,10 @@ final class SettingsStore {
         didSet { UserDefaults.standard.set(historyPreviewLines, forKey: "historyPreviewLines") }
     }
 
+    var historyLength: HistoryLength {
+        didSet { UserDefaults.standard.set(historyLength.rawValue, forKey: "historyLength") }
+    }
+
     var exportDirectory: String {
         didSet { UserDefaults.standard.set(exportDirectory, forKey: "exportDirectory") }
     }
@@ -183,6 +215,7 @@ final class SettingsStore {
         enableVoiceCommands = false
         updateCheckMode = .manual
         historyPreviewLines = 3
+        historyLength = .twenty
         exportDirectory = SettingsStore.defaultDownloadsPath
     }
 
@@ -218,6 +251,7 @@ final class SettingsStore {
         self.enableVoiceCommands = ud.bool(forKey: "enableVoiceCommands")
         self.updateCheckMode = UpdateCheckMode(rawValue: ud.string(forKey: "updateCheckMode") ?? "") ?? .manual
         self.historyPreviewLines = ud.object(forKey: "historyPreviewLines") == nil ? 3 : ud.integer(forKey: "historyPreviewLines")
+        self.historyLength = ud.object(forKey: "historyLength") == nil ? .twenty : (HistoryLength(rawValue: ud.integer(forKey: "historyLength")) ?? .twenty)
         self.exportDirectory = ud.string(forKey: "exportDirectory") ?? SettingsStore.defaultDownloadsPath
     }
 

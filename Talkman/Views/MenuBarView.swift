@@ -453,6 +453,9 @@ struct MenuBarView: View {
                 .allowsHitTesting(false)
         }
         .onHover { hovering in hoveredHistoryId = hovering ? entry.id : nil }
+        .contentShape(Rectangle())
+        .onTapGesture { copyEntry(entry) }
+        .help("Click to copy")
         .contextMenu {
             Button {
                 copyEntry(entry)
@@ -753,6 +756,20 @@ private struct InlineSettingsView: View {
                     .fixedSize()
                 }
 
+                settingsRow("History length") {
+                    Picker("", selection: Binding(
+                        get: { settings.historyLength },
+                        set: { newValue in
+                            settings.historyLength = newValue
+                            HistoryService.shared.enforceLimit()
+                        }
+                    )) {
+                        ForEach(HistoryLength.allCases) { Text($0.label).tag($0) }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                }
+
                 HStack {
                     Text("Export folder")
                         .font(labelFont)
@@ -775,6 +792,64 @@ private struct InlineSettingsView: View {
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.regular)
+                }
+
+                Divider().opacity(0.5)
+
+                settingsRow("Check for updates") {
+                    Picker("", selection: Binding(
+                        get: { settings.updateCheckMode },
+                        set: { newMode in
+                            settings.updateCheckMode = newMode
+                            if newMode == .daily { Task { await updater.autoCheckIfDue() } }
+                        }
+                    )) {
+                        ForEach(UpdateCheckMode.allCases) { Text($0.label).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .fixedSize()
+                }
+
+                Text(settings.updateCheckMode == .daily
+                     ? "Talkman checks GitHub once a day. One request, no account, nothing sent."
+                     : "No automatic checks. Talkman makes no network calls unless you press Check Now.")
+                    .font(labelFont)
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 8) {
+                    Button {
+                        Task { await updater.checkNow() }
+                    } label: {
+                        Text(updater.isChecking ? "Checking…" : "Check Now")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(updater.isChecking)
+                    Spacer()
+                }
+
+                if updater.updateAvailable, let v = updater.latestVersion, let url = updater.releaseURL {
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "arrow.down.circle.fill")
+                            .foregroundStyle(.green)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Update available: v\(v)")
+                            Link("Download from GitHub", destination: url)
+                        }
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .font(labelFont)
+                } else if updater.lastCheckFailed {
+                    Text("Couldn't reach GitHub. Check your connection and try Check Now again.")
+                        .font(labelFont)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if updater.lastChecked != nil {
+                    Text("You're on the latest version (v\(updater.currentVersion)).")
+                        .font(labelFont)
+                        .foregroundStyle(.tertiary)
                 }
             }
 
@@ -972,65 +1047,6 @@ private struct InlineSettingsView: View {
             // Word list — outside SettingsCard so @Observable triggers correctly
             if expandedSection == "Word Corrections" {
                 wordListSection
-            }
-
-            // Updates
-            SettingsCard(title: "Updates", isExpanded: expandedSection == "Updates", onToggle: { toggleSection("Updates") }) {
-                settingsRow("Check for updates") {
-                    Picker("", selection: Binding(
-                        get: { settings.updateCheckMode },
-                        set: { newMode in
-                            settings.updateCheckMode = newMode
-                            if newMode == .daily { Task { await updater.autoCheckIfDue() } }
-                        }
-                    )) {
-                        ForEach(UpdateCheckMode.allCases) { Text($0.label).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .fixedSize()
-                }
-
-                Text(settings.updateCheckMode == .daily
-                     ? "Talkman checks GitHub once a day. One request, no account, nothing sent."
-                     : "No automatic checks. Talkman makes no network calls unless you press Check Now.")
-                    .font(labelFont)
-                    .foregroundStyle(.tertiary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                HStack(spacing: 8) {
-                    Button {
-                        Task { await updater.checkNow() }
-                    } label: {
-                        Text(updater.isChecking ? "Checking…" : "Check Now")
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .disabled(updater.isChecking)
-                    Spacer()
-                }
-
-                if updater.updateAvailable, let v = updater.latestVersion, let url = updater.releaseURL {
-                    HStack(alignment: .top, spacing: 6) {
-                        Image(systemName: "arrow.down.circle.fill")
-                            .foregroundStyle(.green)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Update available: v\(v)")
-                            Link("Download from GitHub", destination: url)
-                        }
-                        .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .font(labelFont)
-                } else if updater.lastCheckFailed {
-                    Text("Couldn't reach GitHub. Check your connection and try Check Now again.")
-                        .font(labelFont)
-                        .foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
-                } else if updater.lastChecked != nil {
-                    Text("You're on the latest version (v\(updater.currentVersion)).")
-                        .font(labelFont)
-                        .foregroundStyle(.tertiary)
-                }
             }
 
             HStack {

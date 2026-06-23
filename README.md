@@ -107,7 +107,7 @@ The mic icon turns red while recording.
 - **Paragraph breaks** — automatically inserts paragraph breaks after 2.5s+ pauses
 - **Auto-stop** — configurable silence timeout (10s-60s or off)
 - **Prefix/suffix text** — automatically prepend or append text to each transcription
-- **Transcription history** — last 10 recordings, click to copy
+- **Transcription history** — click any entry to copy; history length is configurable (from none to unlimited)
 - **Launch at Login** — via SMAppService
 - **Update checks** — your choice: *Manual* (no network calls at all, the default) or *Daily* (one lightweight GitHub check per day). No account, no telemetry.
 
