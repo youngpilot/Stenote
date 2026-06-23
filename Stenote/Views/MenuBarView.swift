@@ -217,11 +217,12 @@ struct MenuBarView: View {
             historySection
         }
 
-        // Status bar at the bottom. Hovering it reveals the version + GitHub
-        // link (opacity swap, no layout change — required inside MenuBarExtra).
-        Divider()
+        // Status bar. Hovering anywhere below the separator (incl. the existing
+        // gap) reveals the version + GitHub link — no extra spacing added.
+        VStack(spacing: DesignTokens.Spacing.m) {
+            Divider()
 
-        ZStack {
+            ZStack {
             HStack(spacing: 6) {
                 Circle()
                     .fill(statusColor)
@@ -273,9 +274,8 @@ struct MenuBarView: View {
             .font(.caption)
             .opacity(footerHover ? 1 : 0)
             .allowsHitTesting(footerHover)
+            }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 6)
         .contentShape(Rectangle())
         .onHover { footerHover = $0 }
     }
