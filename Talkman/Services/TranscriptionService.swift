@@ -26,6 +26,11 @@ final class TranscriptionService {
 
     private var ctcModels: CtcModels? { ctcBox?.value }
 
+    // Lazy load state for the CTC vocabulary-boosting model (~98 MB).
+    private(set) var isVocabModelLoading = false
+    private(set) var vocabModelLoadFailed = false
+    private var ctcLoadTask: Task<Bool, Never>?
+
     // --- Streaming state ---
     private var lastConfirmedText = ""      // used for volatile preview diff
     private var lastPastedConfirmedText = "" // delta tracking for incremental paste
@@ -52,23 +57,50 @@ final class TranscriptionService {
     // MARK: - Model Loading
 
     func loadModel() async throws {
-        modelLoadingStep = "Downloading ASR model… (1/3)"
+        modelLoadingStep = "Downloading ASR model… (1/2)"
         let models = try await AsrModels.downloadAndLoad(version: .v3)
         asrModels = UncheckedSendableBox(models)
 
         // VAD powers auto-stop and paragraph-break detection
-        modelLoadingStep = "Loading VAD model… (2/3)"
+        modelLoadingStep = "Loading VAD model… (2/2)"
         vadManager = try await VadManager()
 
-        // CTC models power optional vocabulary boosting
-        modelLoadingStep = "Loading vocabulary model… (3/3)"
-        ctcBox = UncheckedSendableBox(try await CtcModels.downloadAndLoad())
+        // The CTC vocabulary model (~98 MB) is downloaded lazily the first time
+        // the user enables Model Boosting — see ensureVocabModelsLoaded().
 
         modelLoadingStep = ""
         isModelLoaded = true
     }
 
     // MARK: - Vocabulary Boosting
+
+    /// Idempotently download + load the CTC model used for vocabulary boosting.
+    /// Triggered when the user enables Model Boosting, and awaited (as a no-op
+    /// once loaded) before each session. Returns true when the model is ready.
+    @discardableResult
+    func ensureVocabModelsLoaded() async -> Bool {
+        if ctcBox != nil { return true }
+        if let task = ctcLoadTask { return await task.value }
+
+        isVocabModelLoading = true
+        vocabModelLoadFailed = false
+        let task = Task { () -> Bool in
+            do {
+                let models = try await CtcModels.downloadAndLoad()
+                ctcBox = UncheckedSendableBox(models)
+                return true
+            } catch {
+                logger.error("Vocabulary model load failed: \(error.localizedDescription)")
+                return false
+            }
+        }
+        ctcLoadTask = task
+        let ok = await task.value
+        ctcLoadTask = nil
+        isVocabModelLoading = false
+        vocabModelLoadFailed = !ok
+        return ok
+    }
 
     private func buildVocabularyTerms() -> [CustomVocabularyTerm] {
         let brandNames = textReplacement.replacements
@@ -209,10 +241,12 @@ final class TranscriptionService {
         )
         let asr = StreamingAsrManager(config: config)
 
-        // Optional vocabulary boosting (off by default)
-        if SettingsStore.shared.enableVocabBoosting, let ctcModels {
+        // Optional vocabulary boosting (off by default). The CTC model loads
+        // lazily; if it isn't ready yet (e.g. first use while offline), skip
+        // boosting for this session rather than blocking or failing recording.
+        if SettingsStore.shared.enableVocabBoosting {
             let terms = buildVocabularyTerms()
-            if !terms.isEmpty {
+            if !terms.isEmpty, await ensureVocabModelsLoaded(), let ctcModels {
                 let vocabContext = CustomVocabularyContext(terms: terms)
                 do {
                     try await asr.configureVocabularyBoosting(

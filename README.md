@@ -38,7 +38,7 @@ Most dictation tools make you trade something away: privacy for polish, or price
 | **Price** | Free, unlimited | Free | Free tier ~2,000 words/week; Pro $15/mo ($144/yr) | Freemium or paid (subscription or one-time) |
 | **Languages** | 25 European, auto-detected with no manual switching, even German and English mixed in one sentence | Several, but you switch by hand (Globe key) | 100+ (cloud) | Many, but usually one model per language or a manual pick |
 | **Accuracy model** | Parakeet TDT v3, a transducer that minimizes hallucination | Apple on-device model; silence cutoffs, no custom vocabulary, accuracy regressions across releases | Cloud models with strong auto-formatting | Whisper: accurate, but prone to hallucinate during silence |
-| **Footprint** | 16 MB app, ~560 MB model downloaded once, then fully offline | Built into macOS | Tiny app, but needs internet for every dictation | Larger models (Whisper large is ~1.5 GB) |
+| **Footprint** | 16 MB app, ~460 MB model on first run, then fully offline | Built into macOS | Tiny app, but needs internet for every dictation | Larger models (Whisper large is ~1.5 GB) |
 | **Design** | Minimal menubar app, types into any app | System feature | Polished, with AI commands and formatting | File transcription plus power features |
 
 What this means in practice:
@@ -68,10 +68,10 @@ Talkman works in **any text field, in any app** — your editor, browser, termin
 
 ## Install
 
-1. Download `Talkman-0.7.0.dmg` from the [latest release](https://github.com/youngpilot/Talkman/releases/latest)
+1. Download `Talkman-0.7.1.dmg` from the [latest release](https://github.com/youngpilot/Talkman/releases/latest)
 2. Open the DMG and drag Talkman to Applications
 3. Launch Talkman — grant Microphone and Accessibility permissions when prompted
-4. The speech models download automatically on first launch (~560 MB, one-time — then fully offline)
+4. The speech model downloads automatically on first launch (~460 MB, one-time — then fully offline). The optional word-boosting model adds ~100 MB only if you turn it on.
 
 > If macOS says the app "cannot be opened because the developer cannot be verified," right-click the app → **Open** → **Open**. Released builds are notarized, so this only happens with copies you build yourself.
 
@@ -135,7 +135,7 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
   xcodebuild -project Talkman.xcodeproj -scheme Talkman -configuration Debug build
 ```
 
-The first build resolves the FluidAudio Swift package automatically. To produce a signed build, set your own Apple Developer Team in Xcode (*Signing & Capabilities*) or override `DEVELOPMENT_TEAM`. Models are downloaded automatically on first launch (~560 MB, one-time).
+The first build resolves the FluidAudio Swift package automatically. To produce a signed build, set your own Apple Developer Team in Xcode (*Signing & Capabilities*) or override `DEVELOPMENT_TEAM`. Models are downloaded automatically on first launch (~460 MB, one-time).
 
 ## Experimental
 

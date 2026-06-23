@@ -35,6 +35,14 @@ final class RecordingManager {
     var lastConfidence: Float { transcriptionService.lastConfidence }
     var minTokenConfidence: Float { transcriptionService.minTokenConfidence }
     var avgTokenConfidence: Float { transcriptionService.avgTokenConfidence }
+    var isVocabModelLoading: Bool { transcriptionService.isVocabModelLoading }
+    var vocabModelLoadFailed: Bool { transcriptionService.vocabModelLoadFailed }
+
+    /// Preload the CTC vocabulary model when the user enables Model Boosting,
+    /// so it's ready before the next recording.
+    func prepareVocabularyBoosting() {
+        Task { await transcriptionService.ensureVocabModelsLoaded() }
+    }
 
     private init() {
         hotkeyService.onToggle = { [weak self] in

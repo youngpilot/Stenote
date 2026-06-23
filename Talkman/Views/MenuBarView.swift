@@ -651,6 +651,7 @@ private struct InlineSettingsView: View {
     @State private var settings = SettingsStore.shared
     @State private var replacementService = TextReplacementService.shared
     @State private var audioService = SystemAudioService.shared
+    @State private var recordingManager = RecordingManager.shared
     @State private var newFrom = ""
     @State private var newTo = ""
     @State private var showFnKeyHint = false
@@ -903,11 +904,33 @@ private struct InlineSettingsView: View {
 
                 Toggle("Model Boosting", isOn: Binding(
                     get: { settings.enableVocabBoosting },
-                    set: { settings.enableVocabBoosting = $0 }
+                    set: { newValue in
+                        settings.enableVocabBoosting = newValue
+                        if newValue { recordingManager.prepareVocabularyBoosting() }
+                    }
                 ))
                 .font(labelFont)
 
                 if settings.enableVocabBoosting {
+                    if recordingManager.isVocabModelLoading {
+                        HStack(alignment: .top, spacing: 6) {
+                            ProgressView().controlSize(.small)
+                            Text("Downloading boosting model (~98 MB, one-time)…")
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .font(labelFont)
+                    } else if recordingManager.vocabModelLoadFailed {
+                        HStack(alignment: .top, spacing: 6) {
+                            Image(systemName: "wifi.exclamationmark")
+                                .foregroundStyle(.orange)
+                            Text("Couldn't download the boosting model. It needs internet once — it will retry on your next recording.")
+                                .foregroundStyle(.orange)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .font(labelFont)
+                    }
+
                     HStack(alignment: .top, spacing: 6) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundStyle(.orange)
