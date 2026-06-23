@@ -84,8 +84,9 @@ final class RecordingManager {
         }
         isModelLoading = false
 
-        // Daily update check (no-op in Manual mode; at most one GET per 24h).
-        Task { await UpdateService.shared.autoCheckIfDue() }
+        // Daily update check (no-op in Manual mode; connectivity-driven, at most
+        // one GET per 24h). Touching the singleton also starts its net monitor.
+        UpdateService.shared.maybeAutoCheck()
     }
 
     func toggle() {

@@ -801,7 +801,7 @@ private struct InlineSettingsView: View {
                         get: { settings.updateCheckMode },
                         set: { newMode in
                             settings.updateCheckMode = newMode
-                            if newMode == .daily { Task { await updater.autoCheckIfDue() } }
+                            if newMode == .daily { updater.maybeAutoCheck() }
                         }
                     )) {
                         ForEach(UpdateCheckMode.allCases) { Text($0.label).tag($0) }
@@ -846,7 +846,7 @@ private struct InlineSettingsView: View {
                         .font(labelFont)
                         .foregroundStyle(.orange)
                         .fixedSize(horizontal: false, vertical: true)
-                } else if updater.lastChecked != nil {
+                } else if updater.lastSuccess != nil {
                     Text("You're on the latest version (v\(updater.currentVersion)).")
                         .font(labelFont)
                         .foregroundStyle(.tertiary)
