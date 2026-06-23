@@ -15,6 +15,7 @@ final class SystemAudioService {
     private(set) var detectedMediaApp: String?
 
     private var savedVolume: Float?
+    private var savedMute: Bool?
     private var fadeTimer: Timer?
     private var pausedApp: String?
     private let fadeDuration: TimeInterval = 0.3
@@ -53,27 +54,21 @@ final class SystemAudioService {
         nc.addObserver(forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main, using: handler)
     }
 
-    // MARK: - Media control via AppleScript
+    // MARK: - Media control
 
-    /// Fade audio down and optionally pause media playback
-    func fadeOutAndPause(stopMedia: Bool) {
+    /// Make all output audio inaudible while recording: fade the system volume
+    /// to zero, then hard-mute the output device (so it is silent even on
+    /// devices whose volume scalar never reaches true zero), and pause Spotify
+    /// or Apple Music if either is playing. Undo with restoreMedia().
+    func silenceMedia() {
         fadeTimer?.invalidate()
         pausedApp = nil
+        savedVolume = nil
+        savedMute = nil
 
-        if stopMedia {
-            for (name, scriptName, bundleId) in Self.supportedMediaApps {
-                guard NSWorkspace.shared.runningApplications.contains(where: { $0.bundleIdentifier == bundleId }) else { continue }
-                guard let stateScript = NSAppleScript(source: "tell application \"\(scriptName)\" to player state as string") else { continue }
-                var error: NSDictionary?
-                let descriptor = stateScript.executeAndReturnError(&error)
-                if let result = descriptor.stringValue, result == "playing" {
-                    NSAppleScript(source: "tell application \"\(scriptName)\" to pause")?.executeAndReturnError(nil)
-                    pausedApp = scriptName
-                    logger.info("Paused \(name) via AppleScript")
-                    break
-                }
-            }
-        }
+        // Pause known players first (preserves track position; covers the case
+        // where the output device can't be muted by software).
+        pausePlayingMediaApp()
 
         let deviceID = getDefaultOutputDevice()
         guard deviceID != kAudioObjectUnknown else {
@@ -81,37 +76,61 @@ final class SystemAudioService {
             return
         }
 
+        savedMute = getMute(deviceID: deviceID)
         let currentVolume = getVolume(deviceID: deviceID)
-        if currentVolume < 0.001 {
-            savedVolume = 0
-            return
-        }
-
         savedVolume = currentVolume
-        animateVolume(deviceID: deviceID, from: currentVolume, to: 0)
-        logger.info("Fading out system audio from \(currentVolume)")
+
+        if currentVolume > 0.001 {
+            animateVolume(deviceID: deviceID, from: currentVolume, to: 0) { [weak self] in
+                self?.setMute(deviceID: deviceID, muted: true)
+            }
+        } else {
+            setMute(deviceID: deviceID, muted: true)
+        }
+        logger.info("Silenced media (volume \(currentVolume) → muted)")
     }
 
-    /// Resume media playback and fade audio back up
-    func resumeAndFadeIn() {
+    /// Undo silenceMedia(): restore the prior mute state, fade the volume back
+    /// up, and resume the paused player. No-op if nothing was silenced, so it
+    /// never touches a device the user muted themselves.
+    func restoreMedia() {
+        guard savedVolume != nil || pausedApp != nil else { return }
         fadeTimer?.invalidate()
 
         let deviceID = getDefaultOutputDevice()
-        let targetVolume = savedVolume ?? 0
-
-        if targetVolume > 0.001, deviceID != kAudioObjectUnknown {
-            animateVolume(deviceID: deviceID, from: 0, to: targetVolume)
-            logger.info("Fading in system audio to \(targetVolume)")
+        if deviceID != kAudioObjectUnknown {
+            setMute(deviceID: deviceID, muted: savedMute ?? false)
+            let targetVolume = savedVolume ?? 0
+            if targetVolume > 0.001 {
+                animateVolume(deviceID: deviceID, from: getVolume(deviceID: deviceID), to: targetVolume)
+                logger.info("Restored system audio to \(targetVolume)")
+            }
         }
         savedVolume = nil
+        savedMute = nil
 
         if let app = pausedApp {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                let playScript = NSAppleScript(source: "tell application \"\(app)\" to play")
-                playScript?.executeAndReturnError(nil)
+                NSAppleScript(source: "tell application \"\(app)\" to play")?.executeAndReturnError(nil)
                 logger.info("Resumed \(app) via AppleScript")
             }
             pausedApp = nil
+        }
+    }
+
+    /// Pause the first running, currently-playing supported media app.
+    private func pausePlayingMediaApp() {
+        for (name, scriptName, bundleId) in Self.supportedMediaApps {
+            guard NSWorkspace.shared.runningApplications.contains(where: { $0.bundleIdentifier == bundleId }) else { continue }
+            guard let stateScript = NSAppleScript(source: "tell application \"\(scriptName)\" to player state as string") else { continue }
+            var error: NSDictionary?
+            let descriptor = stateScript.executeAndReturnError(&error)
+            if let result = descriptor.stringValue, result == "playing" {
+                NSAppleScript(source: "tell application \"\(scriptName)\" to pause")?.executeAndReturnError(nil)
+                pausedApp = scriptName
+                logger.info("Paused \(name) via AppleScript")
+                break
+            }
         }
     }
 
@@ -157,16 +176,20 @@ final class SystemAudioService {
         }
     }
 
+    /// True if we can silence this output device by software — either via a
+    /// volume scalar or a dedicated mute property.
     private func checkVolumeSupport() -> Bool {
         let deviceID = getDefaultOutputDevice()
         guard deviceID != kAudioObjectUnknown else { return false }
-        for element: UInt32 in [kAudioObjectPropertyElementMain, 1] {
-            var address = AudioObjectPropertyAddress(
-                mSelector: kAudioDevicePropertyVolumeScalar,
-                mScope: kAudioDevicePropertyScopeOutput,
-                mElement: element
-            )
-            if AudioObjectHasProperty(deviceID, &address) { return true }
+        for selector in [kAudioDevicePropertyVolumeScalar, kAudioDevicePropertyMute] {
+            for element: UInt32 in [kAudioObjectPropertyElementMain, 1] {
+                var address = AudioObjectPropertyAddress(
+                    mSelector: selector,
+                    mScope: kAudioDevicePropertyScopeOutput,
+                    mElement: element
+                )
+                if AudioObjectHasProperty(deviceID, &address) { return true }
+            }
         }
         return false
     }
@@ -226,6 +249,41 @@ final class SystemAudioService {
                 UInt32(MemoryLayout<Float32>.size), &vol
             )
         }
+    }
+
+    private nonisolated func setMute(deviceID: AudioDeviceID, muted: Bool) {
+        var val: UInt32 = muted ? 1 : 0
+        for element: UInt32 in [kAudioObjectPropertyElementMain, 1, 2] {
+            var address = AudioObjectPropertyAddress(
+                mSelector: kAudioDevicePropertyMute,
+                mScope: kAudioDevicePropertyScopeOutput,
+                mElement: element
+            )
+            if AudioObjectHasProperty(deviceID, &address) {
+                AudioObjectSetPropertyData(
+                    deviceID, &address, 0, nil,
+                    UInt32(MemoryLayout<UInt32>.size), &val
+                )
+            }
+        }
+    }
+
+    private func getMute(deviceID: AudioDeviceID) -> Bool? {
+        for element: UInt32 in [kAudioObjectPropertyElementMain, 1] {
+            var address = AudioObjectPropertyAddress(
+                mSelector: kAudioDevicePropertyMute,
+                mScope: kAudioDevicePropertyScopeOutput,
+                mElement: element
+            )
+            if AudioObjectHasProperty(deviceID, &address) {
+                var muted: UInt32 = 0
+                var size = UInt32(MemoryLayout<UInt32>.size)
+                if AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &muted) == noErr {
+                    return muted != 0
+                }
+            }
+        }
+        return nil
     }
 }
 

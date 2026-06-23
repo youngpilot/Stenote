@@ -309,7 +309,7 @@ struct MenuBarView: View {
         if s.hotkeys != [.doubleRightOption] { items.append("Shortcuts → Double-press Right ⌥ only") }
         if s.vadSensitivity != .normal { items.append("Pause sensitivity: \(s.vadSensitivity.label) → Normal") }
         if s.autoStopTimeout != .thirty { items.append("Auto-stop: \(s.autoStopTimeout.label) → 30s") }
-        if s.mediaPlaybackOption != .none { items.append("Playback: \(s.mediaPlaybackOption.label) → Don't interrupt") }
+        if !s.silenceMediaWhileRecording { items.append("Silence media while recording: off → on") }
         if !s.prefixText.isEmpty { items.append("Prefix: \"\(s.prefixText)\" → empty") }
         if !s.suffixText.isEmpty { items.append("Suffix: \"\(s.suffixText)\" → empty") }
 
@@ -580,10 +580,8 @@ struct MenuBarView: View {
         }
         if recordingManager.modelLoadError != nil { return "Model error" }
         if recordingManager.isModelLoaded {
-            if settings.mediaPlaybackOption == .muteOnly {
-                if !audioService.supportsVolumeControl {
-                    return "Ready — Mute may not work with this audio device"
-                }
+            if settings.silenceMediaWhileRecording, !audioService.supportsVolumeControl, audioService.detectedMediaApp == nil {
+                return "Ready — can't silence this audio device"
             }
             return "Ready"
         }
@@ -595,9 +593,7 @@ struct MenuBarView: View {
         if recordingManager.isModelLoading { return .orange }
         if recordingManager.modelLoadError != nil { return .red }
         if recordingManager.isModelLoaded {
-            if settings.mediaPlaybackOption == .muteOnly {
-                if !audioService.supportsVolumeControl { return .orange }
-            }
+            if settings.silenceMediaWhileRecording, !audioService.supportsVolumeControl, audioService.detectedMediaApp == nil { return .orange }
             return .green
         }
         return .secondary
@@ -784,50 +780,41 @@ private struct InlineSettingsView: View {
 
             // Recording
             SettingsCard(title: "Recording", isExpanded: expandedSection == "Recording", onToggle: { toggleSection("Recording") }) {
-                settingsRow("Media Playback") {
-                    Picker("", selection: Binding(
-                        get: { settings.mediaPlaybackOption },
-                        set: { settings.mediaPlaybackOption = $0 }
-                    )) {
-                        ForEach(MediaPlaybackOption.allCases) { option in
-                            Text(option.label).tag(option)
-                        }
-                    }
-                    .labelsHidden()
-                    .fixedSize()
-                }
+                Toggle("Silence media while recording", isOn: Binding(
+                    get: { settings.silenceMediaWhileRecording },
+                    set: { settings.silenceMediaWhileRecording = $0 }
+                ))
+                .font(labelFont)
 
-                if settings.mediaPlaybackOption == .stopMedia {
+                if settings.silenceMediaWhileRecording {
+                    Text("Mutes all audio to silence while you dictate, and pauses Spotify or Apple Music if they're playing. Everything resumes when you stop.")
+                        .font(labelFont)
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+
                     if let app = audioService.detectedMediaApp {
                         HStack(alignment: .top, spacing: 6) {
-                            Image(systemName: "info.circle.fill")
+                            Image(systemName: "pause.circle.fill")
                                 .foregroundStyle(.blue)
-                            Text("\(app) detected — will pause and resume during recording.")
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .font(labelFont)
-                    } else {
-                        HStack(alignment: .top, spacing: 6) {
-                            Image(systemName: "info.circle.fill")
-                                .foregroundStyle(.secondary)
-                            Text("Works with Spotify and Apple Music. No supported app running.")
+                            Text("\(app) detected — it will pause and resume too.")
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         .font(labelFont)
                     }
-                }
 
-                if settings.mediaPlaybackOption == .muteOnly, !audioService.supportsVolumeControl {
-                    HStack(alignment: .top, spacing: 6) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
-                        Text("Your audio device doesn't support software volume control. Use \"Pause & Resume\" instead.")
-                            .foregroundStyle(.orange)
-                            .fixedSize(horizontal: false, vertical: true)
+                    if !audioService.supportsVolumeControl {
+                        HStack(alignment: .top, spacing: 6) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                            Text(audioService.detectedMediaApp == nil
+                                 ? "This audio device can't be muted by software, and no Spotify or Apple Music is running to pause."
+                                 : "This audio device can't be muted by software, but the detected player will still be paused.")
+                                .foregroundStyle(.orange)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .font(labelFont)
                     }
-                    .font(labelFont)
                 }
 
                 settingsRow("Pause sensitivity") {

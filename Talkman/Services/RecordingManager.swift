@@ -140,13 +140,8 @@ final class RecordingManager {
             needsAccessibility = !AXIsProcessTrusted()
             SoundFeedback.playStart()
 
-            switch SettingsStore.shared.mediaPlaybackOption {
-            case .stopMedia:
-                systemAudio.fadeOutAndPause(stopMedia: true)
-            case .muteOnly:
-                systemAudio.fadeOutAndPause(stopMedia: false)
-            case .none:
-                break
+            if SettingsStore.shared.silenceMediaWhileRecording {
+                systemAudio.silenceMedia()
             }
 
             // Paste prefix text if configured
@@ -166,9 +161,9 @@ final class RecordingManager {
         audioLevel = 0.0
         waveformSamples = []
         sampleRingBuffer = RingBuffer<Float>(capacity: 16000 * 3, defaultValue: 0)
-        if SettingsStore.shared.mediaPlaybackOption != .none {
-            systemAudio.resumeAndFadeIn()
-        }
+        // Always restore — no-op if nothing was silenced (handles the setting
+        // being toggled off mid-recording).
+        systemAudio.restoreMedia()
         SoundFeedback.playStop()
 
         // Drain in-flight audio Tasks before stopping transcription.

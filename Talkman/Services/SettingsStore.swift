@@ -46,21 +46,6 @@ enum AutoStopOption: Int, CaseIterable, Identifiable {
     }
 }
 
-enum MediaPlaybackOption: String, CaseIterable, Identifiable {
-    case none = "none"
-    case stopMedia = "stopMedia"
-    case muteOnly = "muteOnly"
-
-    var id: String { rawValue }
-
-    var label: String {
-        switch self {
-        case .none: "Don't interrupt"
-        case .stopMedia: "Pause & Resume"
-        case .muteOnly: "Mute Only"
-        }
-    }
-}
 
 enum HotkeyChoice: String, CaseIterable, Identifiable {
     case doubleRightOption = "doubleRightOption"
@@ -153,8 +138,10 @@ final class SettingsStore {
         didSet { UserDefaults.standard.set(autoStopTimeout.rawValue, forKey: "autoStopTimeout") }
     }
 
-    var mediaPlaybackOption: MediaPlaybackOption {
-        didSet { UserDefaults.standard.set(mediaPlaybackOption.rawValue, forKey: "mediaPlaybackOption") }
+    /// When recording, mute all output to silence and pause Spotify / Apple
+    /// Music if playing. On by default.
+    var silenceMediaWhileRecording: Bool {
+        didSet { UserDefaults.standard.set(silenceMediaWhileRecording, forKey: "silenceMediaWhileRecording") }
     }
 
     var enableVocabBoosting: Bool {
@@ -190,7 +177,7 @@ final class SettingsStore {
         suffixText = ""
         vadSensitivity = .normal
         autoStopTimeout = .thirty
-        mediaPlaybackOption = .none
+        silenceMediaWhileRecording = true
         enableVocabBoosting = false
         insertionMode = .auto
         enableVoiceCommands = false
@@ -218,7 +205,14 @@ final class SettingsStore {
             if ud.object(forKey: "autoStopTimeout") == nil { return .thirty }
             return AutoStopOption(rawValue: ud.integer(forKey: "autoStopTimeout")) ?? .thirty
         }()
-        self.mediaPlaybackOption = MediaPlaybackOption(rawValue: ud.string(forKey: "mediaPlaybackOption") ?? "") ?? .none
+        // New key wins; else migrate the old picker (.none → off, otherwise on); else default on.
+        if ud.object(forKey: "silenceMediaWhileRecording") != nil {
+            self.silenceMediaWhileRecording = ud.bool(forKey: "silenceMediaWhileRecording")
+        } else if let legacy = ud.string(forKey: "mediaPlaybackOption") {
+            self.silenceMediaWhileRecording = (legacy != "none")
+        } else {
+            self.silenceMediaWhileRecording = true
+        }
         self.enableVocabBoosting = ud.object(forKey: "enableVocabBoosting") == nil ? false : ud.bool(forKey: "enableVocabBoosting")
         self.insertionMode = InsertionMode(rawValue: ud.string(forKey: "insertionMode") ?? "") ?? .auto
         self.enableVoiceCommands = ud.bool(forKey: "enableVoiceCommands")
