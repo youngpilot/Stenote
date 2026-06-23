@@ -227,7 +227,7 @@ struct MenuBarView: View {
                     .fill(statusColor)
                     .frame(width: 8, height: 8)
                 Text(statusText)
-                    .font(.body)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
                 if recordingManager.isRecording, !recordingManager.detectedLanguage.isEmpty {
                     Text("·")
