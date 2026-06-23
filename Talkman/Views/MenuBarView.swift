@@ -307,7 +307,7 @@ struct MenuBarView: View {
         let r = TextReplacementService.shared
 
         if s.hotkeys != [.doubleRightOption] { items.append("Shortcuts → Double-press Right ⌥ only") }
-        if s.autoStopTimeout != .thirty { items.append("Auto-stop: \(s.autoStopTimeout.label) → 30s") }
+        if s.autoStopTimeout != .thirty { items.append("Stop after silence: \(s.autoStopTimeout.label) → 30s") }
         if !s.silenceMediaWhileRecording { items.append("Silence media while recording: off → on") }
         if !s.pauseMediaApps { items.append("Pause Spotify/Apple Music: off → on") }
         if !s.prefixText.isEmpty { items.append("Prefix: \"\(s.prefixText)\" → empty") }
@@ -896,7 +896,7 @@ private struct InlineSettingsView: View {
                     }
                 }
 
-                settingsRow("Auto-stop silence") {
+                settingsRow("Stop after silence") {
                     Picker("", selection: Binding(
                         get: { settings.autoStopTimeout },
                         set: { settings.autoStopTimeout = $0 }

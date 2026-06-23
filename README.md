@@ -68,7 +68,7 @@ Talkman works in **any text field, in any app** — your editor, browser, termin
 
 ## Install
 
-1. Download `Talkman-0.7.1.dmg` from the [latest release](https://github.com/youngpilot/Talkman/releases/latest)
+1. Download `Talkman-0.7.3.dmg` from the [latest release](https://github.com/youngpilot/Talkman/releases/latest)
 2. Open the DMG and drag Talkman to Applications
 3. Launch Talkman — grant Microphone and Accessibility permissions when prompted
 4. The speech model downloads automatically on first launch (~460 MB, one-time — then fully offline). The optional word-boosting model adds ~100 MB only if you turn it on.
@@ -101,7 +101,7 @@ The mic icon turns red while recording.
 - **Menubar-only** — lives in your menu bar, no dock icon, no windows, out of your way
 - **Global hotkey** — double-press Right ⌥ to toggle recording (configurable: Right ⌘, ⌥ + Space, Fn + Space, F5, Fn/🌐 — multiple shortcuts can be active simultaneously)
 - **Right-click to record** — right-click the menubar icon to start/stop recording
-- **Media playback control** — automatically pauses Spotify or Apple Music while recording and resumes after
+- **Media control while recording** — two independent options (both on by default): mute all system audio to silence, and pause/resume Spotify or Apple Music
 - **Smart clipboard** — uses concealed pasteboard type so clipboard managers (Maccy, Paste, Alfred) ignore transcription pastes; restores your clipboard after each session
 - **Word corrections** — teach Talkman your brand names with custom word replacements + vocabulary boosting
 - **Paragraph breaks** — automatically inserts paragraph breaks after 2.5s+ pauses
