@@ -769,6 +769,7 @@ private struct InlineSettingsView: View {
                     set: { settings.launchAtLogin = $0 }
                 ))
                 .font(labelFont)
+                .onAppear { settings.refreshLaunchAtLoginStatus() }
 
                 Button {
                     showShortcutPicker.toggle()

@@ -1,6 +1,9 @@
 import ServiceManagement
 import SwiftUI
 import Observation
+import os
+
+private let launchLoginLogger = Logger(subsystem: "com.youngpilot.Stenote", category: "LaunchAtLogin")
 
 enum AutoStopOption: Int, CaseIterable, Identifiable {
     case ten = 10
@@ -97,14 +100,52 @@ final class SettingsStore {
     static let shared = SettingsStore()
 
     // Stored properties for @Observable tracking, synced to UserDefaults
+
+    /// Stored mirror of the login-item state. This MUST be a stored property:
+    /// `@Observable` only tracks stored properties, so the previous computed
+    /// `{ SMAppService.mainApp.status == .enabled }` was invisible to SwiftUI —
+    /// toggling it never re-rendered the bound Toggle, so it looked dead even
+    /// though registration had succeeded. We update this optimistically and
+    /// reconcile with the real status (reverting + logging on failure).
+    private(set) var launchAtLoginEnabled: Bool = (SMAppService.mainApp.status == .enabled)
+
     var launchAtLogin: Bool {
-        get { SMAppService.mainApp.status == .enabled }
-        set {
-            if newValue {
-                try? SMAppService.mainApp.register()
+        get { launchAtLoginEnabled }
+        set { setLaunchAtLogin(newValue) }
+    }
+
+    /// Re-reads the authoritative status (e.g. the user may have toggled the app
+    /// off in System Settings › General › Login Items while we weren't running).
+    func refreshLaunchAtLoginStatus() {
+        let actual = (SMAppService.mainApp.status == .enabled)
+        if actual != launchAtLoginEnabled { launchAtLoginEnabled = actual }
+    }
+
+    /// Registers/unregisters the main app as a login item, surfacing the real
+    /// failure reason instead of swallowing it with `try?`. `SMAppService.mainApp`
+    /// requires a Developer ID-signed app in a stable location (e.g. /Applications);
+    /// a translocated or unsigned build throws `Operation not permitted`.
+    private func setLaunchAtLogin(_ enabled: Bool) {
+        let service = SMAppService.mainApp
+        let before = service.status
+        launchAtLoginEnabled = enabled  // optimistic — UI reflects the click immediately
+        do {
+            if enabled {
+                if before != .enabled { try service.register() }
             } else {
-                try? SMAppService.mainApp.unregister()
+                if before == .enabled { try service.unregister() }
             }
+            if enabled && service.status == .requiresApproval {
+                // macOS parked it pending user approval — send them to the toggle.
+                launchLoginLogger.notice("Launch at login requires approval in System Settings › General › Login Items")
+                SMAppService.openSystemSettingsLoginItems()
+            }
+            launchLoginLogger.info(
+                "Launch at login \(enabled ? "enabled" : "disabled", privacy: .public); status \(before.rawValue) -> \(service.status.rawValue)")
+        } catch {
+            launchAtLoginEnabled = (service.status == .enabled)  // revert to reality
+            launchLoginLogger.error(
+                "Launch at login \(enabled ? "register" : "unregister", privacy: .public) failed (status \(before.rawValue)): \(error.localizedDescription, privacy: .public)")
         }
     }
 

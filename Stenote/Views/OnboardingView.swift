@@ -71,7 +71,7 @@ struct OnboardingView: View {
             HStack {
                 if step > 0 {
                     Button("Back") { withAnimation { step -= 1 } }
-                        .buttonStyle(.plain)
+                        .buttonStyle(OnboardingSubtleButtonStyle())
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -87,10 +87,14 @@ struct OnboardingView: View {
                     if step == lastStep { onFinish() } else { withAnimation { step += 1 } }
                 }
                 .keyboardShortcut(.defaultAction)
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(OnboardingPrimaryButtonStyle())
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
+            // Nav chrome shouldn't draw a focus ring: on steps with no other
+            // focusable content (welcome, ready), the prominent button would
+            // otherwise auto-focus and show a ring on top of its accent fill.
+            .focusEffectDisabled()
         }
         .frame(width: 460, height: 580)
         .onAppear(perform: refresh)
@@ -222,9 +226,10 @@ struct OnboardingView: View {
             Text("You're all set")
                 .font(.largeTitle).fontWeight(.semibold)
             VStack(alignment: .leading, spacing: 10) {
-                howToRow("1.", "Press \(shortcutSummary) in any app.")
-                howToRow("2.", "Speak. Pause, or press again, to finish.")
-                howToRow("3.", "Your text appears right at the cursor.")
+                howToRow("1.", "Click into the text field where you want the text to appear.")
+                howToRow("2.", "\(shortcutSummary) to start recording.")
+                howToRow("3.", "Speak. Pause, or press again, to finish.")
+                howToRow("4.", "Your text lands right at the cursor.")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(14)
@@ -261,7 +266,7 @@ struct OnboardingView: View {
                 Label("Granted", systemImage: "checkmark.circle.fill")
                     .labelStyle(.iconOnly).foregroundStyle(.green).font(.title2)
             } else {
-                Button("Allow", action: action).buttonStyle(.bordered)
+                Button("Allow", action: action).buttonStyle(OnboardingSubtleButtonStyle(bordered: true))
             }
         }
         .padding(12)
@@ -286,6 +291,7 @@ struct OnboardingView: View {
     private func refresh() {
         micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
         axGranted = AXIsProcessTrusted()
+        settings.refreshLaunchAtLoginStatus()
     }
 
     private func requestMic() {
@@ -298,5 +304,47 @@ struct OnboardingView: View {
         // String-literal key (kAXTrustedCheckOptionPrompt isn't concurrency-safe in Swift 6).
         _ = AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+    }
+}
+
+// MARK: - Button styles (clear, consistent hover on every onboarding button)
+
+/// Primary call-to-action: accent-filled, brightens on hover, dims on press.
+private struct OnboardingPrimaryButtonStyle: ButtonStyle {
+    @State private var hovering = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.body.weight(.medium))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 7)
+            .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Color.accentColor))
+            .brightness(configuration.isPressed ? -0.08 : (hovering ? 0.10 : 0))
+            .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .onHover { hovering = $0 }
+            .animation(.easeOut(duration: 0.12), value: hovering)
+    }
+}
+
+/// Secondary/tertiary: a subtle fill that clearly brightens on hover.
+/// `bordered` gives a resting fill (standalone actions like “Allow”); otherwise
+/// it's transparent at rest (inline nav like “Back”). Foreground is inherited.
+private struct OnboardingSubtleButtonStyle: ButtonStyle {
+    var bordered = false
+    @State private var hovering = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        let rest = bordered ? 0.07 : 0.0
+        return configuration.label
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(Color.primary.opacity(configuration.isPressed ? 0.18 : (hovering ? 0.13 : rest)))
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .onHover { hovering = $0 }
+            .animation(.easeOut(duration: 0.12), value: hovering)
     }
 }
