@@ -5,6 +5,7 @@ struct MenuBarView: View {
     @State private var settings = SettingsStore.shared
     @State private var audioService = SystemAudioService.shared
     @State private var updater = UpdateService.shared
+    @State private var footerHover = false
     @State private var copiedFeedback = false
     @State private var showSettings = false
     @State private var copiedHistoryId: UUID?
@@ -192,41 +193,65 @@ struct MenuBarView: View {
             historySection
         }
 
-        // Status bar at the bottom
+        // Status bar at the bottom. Hovering it reveals the version + GitHub
+        // link (opacity swap, no layout change — required inside MenuBarExtra).
         Divider()
 
-        HStack(spacing: 6) {
-            Circle()
-                .fill(statusColor)
-                .frame(width: 8, height: 8)
-            Text(statusText)
-                .font(.body)
-                .foregroundStyle(.secondary)
-            if recordingManager.isRecording, !recordingManager.detectedLanguage.isEmpty {
-                Text("·")
-                    .foregroundStyle(.tertiary)
-                Text(recordingManager.detectedLanguage.uppercased())
+        ZStack {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 8, height: 8)
+                Text(statusText)
                     .font(.body)
-                    .fontWeight(.medium)
                     .foregroundStyle(.secondary)
-            }
-            if recordingManager.isRecording, recordingManager.avgTokenConfidence > 0 {
-                Text("·")
-                    .foregroundStyle(.tertiary)
-                Text("\(Int(recordingManager.avgTokenConfidence * 100))%")
-                    .font(.body)
-                    .foregroundStyle(recordingManager.minTokenConfidence < 0.5 ? .orange : .secondary)
-            }
-            Spacer()
-            if !recordingManager.isRecording, !recordingManager.isModelLoading {
-                let h = recordingManager.historyService
-                if h.totalRecordings > 0 {
-                    Text("\(formatDuration(h.totalDuration)) · \(formatCharCount(h.totalCharacters)) chars")
-                        .font(.caption)
-                        .foregroundStyle(.quaternary)
+                if recordingManager.isRecording, !recordingManager.detectedLanguage.isEmpty {
+                    Text("·")
+                        .foregroundStyle(.tertiary)
+                    Text(recordingManager.detectedLanguage.uppercased())
+                        .font(.body)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.secondary)
+                }
+                if recordingManager.isRecording, recordingManager.avgTokenConfidence > 0 {
+                    Text("·")
+                        .foregroundStyle(.tertiary)
+                    Text("\(Int(recordingManager.avgTokenConfidence * 100))%")
+                        .font(.body)
+                        .foregroundStyle(recordingManager.minTokenConfidence < 0.5 ? .orange : .secondary)
+                }
+                Spacer()
+                if !recordingManager.isRecording, !recordingManager.isModelLoading {
+                    let h = recordingManager.historyService
+                    if h.totalRecordings > 0 {
+                        Text("\(formatDuration(h.totalDuration)) · \(formatCharCount(h.totalCharacters)) chars")
+                            .font(.caption)
+                            .foregroundStyle(.quaternary)
+                    }
                 }
             }
+            .opacity(footerHover ? 0 : 1)
+
+            // Revealed on hover
+            HStack {
+                Text("Stenote v\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
+                    .foregroundStyle(.quaternary)
+                Spacer()
+                Text("Stenote on GitHub →")
+                    .foregroundStyle(.secondary)
+                    .pointerStyle(.link)
+                    .onTapGesture {
+                        if let url = URL(string: "https://github.com/youngpilot/Stenote") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+            }
+            .font(.caption)
+            .opacity(footerHover ? 1 : 0)
+            .allowsHitTesting(footerHover)
         }
+        .contentShape(Rectangle())
+        .onHover { footerHover = $0 }
     }
 
     // MARK: - Settings View
