@@ -284,7 +284,6 @@ struct MenuBarView: View {
         let r = TextReplacementService.shared
 
         if s.hotkeys != [.doubleRightOption] { items.append("Shortcuts → Double-press Right ⌥ only") }
-        if !s.enableITN { items.append("Number formatting: off → on") }
         if s.vadSensitivity != .normal { items.append("Pause sensitivity: \(s.vadSensitivity.label) → Normal") }
         if s.autoStopTimeout != .thirty { items.append("Auto-stop: \(s.autoStopTimeout.label) → 30s") }
         if s.mediaPlaybackOption != .none { items.append("Playback: \(s.mediaPlaybackOption.label) → Don't interrupt") }
@@ -864,17 +863,6 @@ private struct InlineSettingsView: View {
                         .foregroundStyle(.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-
-                Toggle("Number Formatting (ITN)", isOn: Binding(
-                    get: { settings.enableITN },
-                    set: { settings.enableITN = $0 }
-                ))
-                .font(labelFont)
-
-                Text("Converts spoken numbers to digits: \"twenty three\" → \"23\", \"january fifth\" → \"January 5th\"")
-                    .font(labelFont)
-                    .foregroundStyle(.tertiary)
-                    .fixedSize(horizontal: false, vertical: true)
 
                 Toggle("Voice Commands", isOn: Binding(
                     get: { settings.enableVoiceCommands },

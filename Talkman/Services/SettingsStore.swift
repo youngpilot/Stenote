@@ -94,10 +94,6 @@ final class SettingsStore {
     static let shared = SettingsStore()
 
     // Stored properties for @Observable tracking, synced to UserDefaults
-    var enableITN: Bool {
-        didSet { UserDefaults.standard.set(enableITN, forKey: "enableITN") }
-    }
-
     var launchAtLogin: Bool {
         get { SMAppService.mainApp.status == .enabled }
         set {
@@ -170,7 +166,6 @@ final class SettingsStore {
     var onHotkeyChanged: ((Set<HotkeyChoice>) -> Void)?
 
     func resetToDefaults() {
-        enableITN = true
         hotkeys = [.doubleRightOption]
         politenessMode = false
         prefixText = ""
@@ -187,7 +182,6 @@ final class SettingsStore {
 
     private init() {
         let ud = UserDefaults.standard
-        self.enableITN = ud.object(forKey: "enableITN") == nil ? true : ud.bool(forKey: "enableITN")
         // Migrate from old single "hotkey" key if needed
         if let rawValues = ud.stringArray(forKey: "hotkeys") {
             let parsed = Set(rawValues.compactMap { HotkeyChoice(rawValue: $0) })

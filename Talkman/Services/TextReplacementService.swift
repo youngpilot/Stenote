@@ -67,10 +67,12 @@ final class TextReplacementService {
                 options: .caseInsensitive
             ) else { continue }
 
+            // Escape $ and \ so replacements are treated as literal text,
+            // not regex template references (e.g. "AT$T", file paths).
             result = regex.stringByReplacingMatches(
                 in: result,
                 range: NSRange(result.startIndex..., in: result),
-                withTemplate: replacement
+                withTemplate: NSRegularExpression.escapedTemplate(for: replacement)
             )
         }
 
