@@ -310,6 +310,7 @@ struct MenuBarView: View {
         if s.vadSensitivity != .normal { items.append("Pause sensitivity: \(s.vadSensitivity.label) → Normal") }
         if s.autoStopTimeout != .thirty { items.append("Auto-stop: \(s.autoStopTimeout.label) → 30s") }
         if !s.silenceMediaWhileRecording { items.append("Silence media while recording: off → on") }
+        if !s.pauseMediaApps { items.append("Pause Spotify/Apple Music: off → on") }
         if !s.prefixText.isEmpty { items.append("Prefix: \"\(s.prefixText)\" → empty") }
         if !s.suffixText.isEmpty { items.append("Suffix: \"\(s.suffixText)\" → empty") }
 
@@ -583,8 +584,8 @@ struct MenuBarView: View {
         }
         if recordingManager.modelLoadError != nil { return "Model error" }
         if recordingManager.isModelLoaded {
-            if settings.silenceMediaWhileRecording, !audioService.supportsVolumeControl, audioService.detectedMediaApp == nil {
-                return "Ready — can't silence this audio device"
+            if settings.silenceMediaWhileRecording, !audioService.supportsVolumeControl {
+                return "Ready — can't mute this audio device"
             }
             return "Ready"
         }
@@ -596,7 +597,7 @@ struct MenuBarView: View {
         if recordingManager.isModelLoading { return .orange }
         if recordingManager.modelLoadError != nil { return .red }
         if recordingManager.isModelLoaded {
-            if settings.silenceMediaWhileRecording, !audioService.supportsVolumeControl, audioService.detectedMediaApp == nil { return .orange }
+            if settings.silenceMediaWhileRecording, !audioService.supportsVolumeControl { return .orange }
             return .green
         }
         return .secondary
@@ -862,33 +863,44 @@ private struct InlineSettingsView: View {
                 .font(labelFont)
 
                 if settings.silenceMediaWhileRecording {
-                    Text("Mutes all audio to silence while you dictate, and pauses Spotify or Apple Music if they're playing. Everything resumes when you stop.")
+                    Text("Mutes all system audio to true silence while you dictate, then restores it when you stop.")
                         .font(labelFont)
                         .foregroundStyle(.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
-
-                    if let app = audioService.detectedMediaApp {
-                        HStack(alignment: .top, spacing: 6) {
-                            Image(systemName: "pause.circle.fill")
-                                .foregroundStyle(.blue)
-                            Text("\(app) detected — it will pause and resume too.")
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .font(labelFont)
-                    }
 
                     if !audioService.supportsVolumeControl {
                         HStack(alignment: .top, spacing: 6) {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .foregroundStyle(.orange)
-                            Text(audioService.detectedMediaApp == nil
-                                 ? "This audio device can't be muted by software, and no Spotify or Apple Music is running to pause."
-                                 : "This audio device can't be muted by software, but the detected player will still be paused.")
+                            Text("This audio device can't be muted by software.")
                                 .foregroundStyle(.orange)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         .font(labelFont)
+                    }
+                }
+
+                Toggle("Pause Spotify & Apple Music", isOn: Binding(
+                    get: { settings.pauseMediaApps },
+                    set: { settings.pauseMediaApps = $0 }
+                ))
+                .font(labelFont)
+
+                if settings.pauseMediaApps {
+                    if let app = audioService.detectedMediaApp {
+                        HStack(alignment: .top, spacing: 6) {
+                            Image(systemName: "pause.circle.fill")
+                                .foregroundStyle(.blue)
+                            Text("\(app) detected — it pauses while you record and resumes after.")
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .font(labelFont)
+                    } else {
+                        Text("Pauses Spotify or Apple Music if either is playing. macOS asks for Automation permission the first time.")
+                            .font(labelFont)
+                            .foregroundStyle(.tertiary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
 

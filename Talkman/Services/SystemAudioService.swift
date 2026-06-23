@@ -54,21 +54,15 @@ final class SystemAudioService {
         nc.addObserver(forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main, using: handler)
     }
 
-    // MARK: - Media control
+    // MARK: - Media control (two independent capabilities)
 
-    /// Make all output audio inaudible while recording: fade the system volume
-    /// to zero, then hard-mute the output device (so it is silent even on
-    /// devices whose volume scalar never reaches true zero), and pause Spotify
-    /// or Apple Music if either is playing. Undo with restoreMedia().
-    func silenceMedia() {
+    /// Make all output audio inaudible: fade the system volume to zero, then
+    /// hard-mute the device (silent even where the volume scalar can't reach
+    /// true zero). Undo with restoreOutput().
+    func muteOutput() {
         fadeTimer?.invalidate()
-        pausedApp = nil
         savedVolume = nil
         savedMute = nil
-
-        // Pause known players first (preserves track position; covers the case
-        // where the output device can't be muted by software).
-        pausePlayingMediaApp()
 
         let deviceID = getDefaultOutputDevice()
         guard deviceID != kAudioObjectUnknown else {
@@ -87,14 +81,13 @@ final class SystemAudioService {
         } else {
             setMute(deviceID: deviceID, muted: true)
         }
-        logger.info("Silenced media (volume \(currentVolume) → muted)")
+        logger.info("Muted output (volume \(currentVolume) → muted)")
     }
 
-    /// Undo silenceMedia(): restore the prior mute state, fade the volume back
-    /// up, and resume the paused player. No-op if nothing was silenced, so it
-    /// never touches a device the user muted themselves.
-    func restoreMedia() {
-        guard savedVolume != nil || pausedApp != nil else { return }
+    /// Undo muteOutput(): restore the prior mute state and fade volume back.
+    /// No-op if we didn't mute, so it never unmutes a device the user muted.
+    func restoreOutput() {
+        guard savedVolume != nil else { return }
         fadeTimer?.invalidate()
 
         let deviceID = getDefaultOutputDevice()
@@ -103,35 +96,63 @@ final class SystemAudioService {
             let targetVolume = savedVolume ?? 0
             if targetVolume > 0.001 {
                 animateVolume(deviceID: deviceID, from: getVolume(deviceID: deviceID), to: targetVolume)
-                logger.info("Restored system audio to \(targetVolume)")
+                logger.info("Restored output to \(targetVolume)")
             }
         }
         savedVolume = nil
         savedMute = nil
+    }
 
-        if let app = pausedApp {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                NSAppleScript(source: "tell application \"\(app)\" to play")?.executeAndReturnError(nil)
-                logger.info("Resumed \(app) via AppleScript")
+    /// Pause the first running, currently-playing supported player
+    /// (Spotify / Apple Music). Undo with resumeMediaApps().
+    func pauseMediaApps() {
+        pausedApp = nil
+        for (name, scriptName, bundleId) in Self.supportedMediaApps {
+            guard NSWorkspace.shared.runningApplications.contains(where: { $0.bundleIdentifier == bundleId }) else { continue }
+            guard isPlaying(scriptName: scriptName) else { continue }
+            if runAppleScript("tell application \"\(scriptName)\" to pause", context: "pause \(name)") {
+                pausedApp = scriptName
+                logger.info("Paused \(name)")
             }
-            pausedApp = nil
+            break
         }
     }
 
-    /// Pause the first running, currently-playing supported media app.
-    private func pausePlayingMediaApp() {
-        for (name, scriptName, bundleId) in Self.supportedMediaApps {
-            guard NSWorkspace.shared.runningApplications.contains(where: { $0.bundleIdentifier == bundleId }) else { continue }
-            guard let stateScript = NSAppleScript(source: "tell application \"\(scriptName)\" to player state as string") else { continue }
-            var error: NSDictionary?
-            let descriptor = stateScript.executeAndReturnError(&error)
-            if let result = descriptor.stringValue, result == "playing" {
-                NSAppleScript(source: "tell application \"\(scriptName)\" to pause")?.executeAndReturnError(nil)
-                pausedApp = scriptName
-                logger.info("Paused \(name) via AppleScript")
-                break
-            }
+    /// Resume the player paused by pauseMediaApps(). No-op if nothing was paused.
+    func resumeMediaApps() {
+        guard let app = pausedApp else { return }
+        pausedApp = nil
+        // Brief delay so resume lands after any unmute/fade settles.
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(150))
+            self.runAppleScript("tell application \"\(app)\" to play", context: "resume \(app)")
+            logger.info("Resumed \(app)")
         }
+    }
+
+    // MARK: - AppleScript helpers
+
+    private func isPlaying(scriptName: String) -> Bool {
+        guard let script = NSAppleScript(source: "tell application \"\(scriptName)\" to player state as string") else { return false }
+        var error: NSDictionary?
+        let descriptor = script.executeAndReturnError(&error)
+        if let error {
+            logger.warning("AppleScript player-state \(scriptName) failed: \(String(describing: error))")
+            return false
+        }
+        return descriptor.stringValue?.lowercased() == "playing"
+    }
+
+    @discardableResult
+    private func runAppleScript(_ source: String, context: String) -> Bool {
+        guard let script = NSAppleScript(source: source) else { return false }
+        var error: NSDictionary?
+        script.executeAndReturnError(&error)
+        if let error {
+            logger.warning("AppleScript (\(context)) failed: \(String(describing: error))")
+            return false
+        }
+        return true
     }
 
     // MARK: - Volume animation

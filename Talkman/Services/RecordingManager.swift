@@ -141,7 +141,10 @@ final class RecordingManager {
             SoundFeedback.playStart()
 
             if SettingsStore.shared.silenceMediaWhileRecording {
-                systemAudio.silenceMedia()
+                systemAudio.muteOutput()
+            }
+            if SettingsStore.shared.pauseMediaApps {
+                systemAudio.pauseMediaApps()
             }
 
             // Paste prefix text if configured
@@ -161,9 +164,10 @@ final class RecordingManager {
         audioLevel = 0.0
         waveformSamples = []
         sampleRingBuffer = RingBuffer<Float>(capacity: 16000 * 3, defaultValue: 0)
-        // Always restore — no-op if nothing was silenced (handles the setting
-        // being toggled off mid-recording).
-        systemAudio.restoreMedia()
+        // Always restore — each is a no-op if it wasn't applied (also handles a
+        // setting being toggled off mid-recording).
+        systemAudio.restoreOutput()
+        systemAudio.resumeMediaApps()
         SoundFeedback.playStop()
 
         // Drain in-flight audio Tasks before stopping transcription.

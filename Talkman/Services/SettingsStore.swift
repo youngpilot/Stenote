@@ -166,10 +166,15 @@ final class SettingsStore {
         didSet { UserDefaults.standard.set(autoStopTimeout.rawValue, forKey: "autoStopTimeout") }
     }
 
-    /// When recording, mute all output to silence and pause Spotify / Apple
-    /// Music if playing. On by default.
+    /// When recording, mute all system output to silence. On by default.
     var silenceMediaWhileRecording: Bool {
         didSet { UserDefaults.standard.set(silenceMediaWhileRecording, forKey: "silenceMediaWhileRecording") }
+    }
+
+    /// When recording, pause Spotify / Apple Music if playing (and resume
+    /// after). Independent of muting. On by default.
+    var pauseMediaApps: Bool {
+        didSet { UserDefaults.standard.set(pauseMediaApps, forKey: "pauseMediaApps") }
     }
 
     var enableVocabBoosting: Bool {
@@ -210,6 +215,7 @@ final class SettingsStore {
         vadSensitivity = .normal
         autoStopTimeout = .thirty
         silenceMediaWhileRecording = true
+        pauseMediaApps = true
         enableVocabBoosting = false
         insertionMode = .auto
         enableVoiceCommands = false
@@ -246,6 +252,7 @@ final class SettingsStore {
         } else {
             self.silenceMediaWhileRecording = true
         }
+        self.pauseMediaApps = ud.object(forKey: "pauseMediaApps") == nil ? true : ud.bool(forKey: "pauseMediaApps")
         self.enableVocabBoosting = ud.object(forKey: "enableVocabBoosting") == nil ? false : ud.bool(forKey: "enableVocabBoosting")
         self.insertionMode = InsertionMode(rawValue: ud.string(forKey: "insertionMode") ?? "") ?? .auto
         self.enableVoiceCommands = ud.bool(forKey: "enableVoiceCommands")
