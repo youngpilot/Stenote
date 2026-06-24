@@ -8,6 +8,8 @@ struct MenuBarView: View {
     @State private var footerHover = false
     @State private var topHover = false
     @State private var copiedFeedback = false
+    @State private var copyCardHover = false
+    @State private var updateBannerHover = false
     @State private var showSettings = false
     @State private var copiedHistoryId: UUID?
     @State private var savedHistoryId: UUID?
@@ -52,10 +54,11 @@ struct MenuBarView: View {
                 .font(.body)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-                .background(Color.green.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                .background(Color.green.opacity(updateBannerHover ? 0.20 : 0.12), in: RoundedRectangle(cornerRadius: 8))
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .onHover { updateBannerHover = $0 }
         }
 
         // Top bar: Shortcut hint (hover → Start/Stop button) + Settings + Quit
@@ -146,6 +149,7 @@ struct MenuBarView: View {
                     Task { await recordingManager.setup() }
                 }
                 .font(.body)
+                .buttonStyle(BorderedHoverButtonStyle())
                 .controlSize(.small)
             }
             .padding(DesignTokens.Spacing.s)
@@ -208,6 +212,8 @@ struct MenuBarView: View {
                 .buttonStyle(.plain)
                 .padding(DesignTokens.Spacing.s)
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(copyCardHover ? 0.07 : 0)))
+                .onHover { copyCardHover = $0 }
             }
         }
 
@@ -259,14 +265,21 @@ struct MenuBarView: View {
 
             // Revealed on hover
             HStack {
-                Text("Stenote on GitHub →")
-                    .foregroundStyle(.secondary)
-                    .pointerStyle(.link)
-                    .onTapGesture {
-                        if let url = URL(string: "https://github.com/youngpilot/Stenote") {
-                            NSWorkspace.shared.open(url)
-                        }
+                Button {
+                    if let url = URL(string: "https://github.com/youngpilot/Stenote") {
+                        NSWorkspace.shared.open(url)
                     }
+                } label: {
+                    HStack(spacing: 6) {
+                        // Info glyph sized + spaced exactly like the status dot above.
+                        Image(systemName: "info.circle")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 8, height: 8)
+                        Text("Stenote on GitHub →")
+                    }
+                }
+                .buttonStyle(LinkHoverButtonStyle())
                 Spacer()
                 Text("Stenote v\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
                     .foregroundStyle(.quaternary)
@@ -297,7 +310,7 @@ struct MenuBarView: View {
                 } label: {
                     Label("Back", systemImage: "chevron.left")
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(BorderedHoverButtonStyle())
                 .controlSize(.regular)
 
                 Spacer()
@@ -307,7 +320,7 @@ struct MenuBarView: View {
                 } label: {
                     Image(systemName: "arrow.counterclockwise")
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(BorderedHoverButtonStyle())
                 .controlSize(.regular)
                 .help("Reset to Defaults")
             }
@@ -328,7 +341,7 @@ struct MenuBarView: View {
                             showResetConfirm = false
                         }
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(BorderedHoverButtonStyle())
                     Spacer()
                     Button("Reset") {
                         SettingsStore.shared.resetToDefaults()
@@ -337,8 +350,7 @@ struct MenuBarView: View {
                             showResetConfirm = false
                         }
                     }
-                    .buttonStyle(.bordered)
-                    .tint(.red)
+                    .buttonStyle(BorderedHoverButtonStyle(tint: .red))
                 }
                 .font(.body)
             }
@@ -411,7 +423,7 @@ struct MenuBarView: View {
                 } label: {
                     Image(systemName: "chevron.left")
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(BorderedHoverButtonStyle())
                 .controlSize(.regular)
                 .disabled(safePage == 0)
 
@@ -425,7 +437,7 @@ struct MenuBarView: View {
                 } label: {
                     Image(systemName: "chevron.right")
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(BorderedHoverButtonStyle())
                 .controlSize(.regular)
                 .disabled(safePage >= totalPages - 1)
             }
@@ -438,9 +450,8 @@ struct MenuBarView: View {
                     historyPage = 0
                     showClearConfirm = false
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(BorderedHoverButtonStyle(tint: .red))
                 .controlSize(.regular)
-                .tint(.red)
             } else {
                 Button("Clear") {
                     showClearConfirm = true
@@ -448,7 +459,7 @@ struct MenuBarView: View {
                         showClearConfirm = false
                     }
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(BorderedHoverButtonStyle())
                 .controlSize(.regular)
             }
         }
@@ -680,6 +691,71 @@ private struct PopoverButtonStyle: ButtonStyle {
     }
 }
 
+/// Bordered button with a clearly visible hover/press highlight. Looks like the
+/// native `.bordered` at rest but reacts on hover. Tint-, controlSize- and
+/// enabled-aware, so it drops in wherever `.buttonStyle(.bordered)` was used.
+private struct BorderedHoverButtonStyle: ButtonStyle {
+    var tint: Color? = nil
+    @State private var hovering = false
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.controlSize) private var controlSize
+
+    func makeBody(configuration: Configuration) -> some View {
+        let base = tint ?? .primary
+        let compact = controlSize == .small || controlSize == .mini
+        let pressed = configuration.isPressed
+        return configuration.label
+            .foregroundStyle(tint ?? .primary)
+            .padding(.horizontal, compact ? 8 : 11)
+            .padding(.vertical, compact ? 3 : 5)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(base.opacity(pressed ? 0.28 : (hovering ? 0.18 : 0.10)))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .strokeBorder(base.opacity(hovering ? 0.32 : 0.16), lineWidth: 0.75)
+            )
+            .opacity(isEnabled ? 1 : 0.4)
+            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .onHover { hovering = isEnabled && $0 }
+            .animation(.easeOut(duration: 0.12), value: hovering)
+    }
+}
+
+/// Link-style button (accent text) that underlines on hover.
+private struct LinkHoverButtonStyle: ButtonStyle {
+    @State private var hovering = false
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(Color.accentColor)
+            .underline(hovering)
+            .opacity(configuration.isPressed ? 0.6 : 1)
+            .contentShape(Rectangle())
+            .pointerStyle(.link)
+            .onHover { hovering = $0 }
+            .animation(.easeOut(duration: 0.12), value: hovering)
+    }
+}
+
+/// Borderless icon button (e.g. +) with a soft rounded hover fill.
+private struct IconHoverButtonStyle: ButtonStyle {
+    @State private var hovering = false
+    @Environment(\.isEnabled) private var isEnabled
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding(4)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color.primary.opacity(configuration.isPressed ? 0.20 : (hovering ? 0.13 : 0)))
+            )
+            .opacity(isEnabled ? 1 : 0.4)
+            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .onHover { hovering = isEnabled && $0 }
+            .animation(.easeOut(duration: 0.12), value: hovering)
+    }
+}
+
 // MARK: - Audio Level Indicator
 
 private struct AudioLevelView: View {
@@ -714,10 +790,14 @@ private struct SettingsCard<Content: View>: View {
     var isExpanded: Bool = true
     var onToggle: (() -> Void)? = nil
     @ViewBuilder var content: () -> Content
+    @State private var blockHover = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: isExpanded ? DesignTokens.Spacing.s : 0) {
+        VStack(alignment: .leading, spacing: 0) {
             if let title {
+                // The header is the toggle target. Its own padding makes the hit
+                // area fill the whole container when collapsed, and keeps that exact
+                // header-band size when expanded — a consistent, easy-to-hit target.
                 HStack {
                     Text(title)
                         .font(.body)
@@ -731,16 +811,33 @@ private struct SettingsCard<Content: View>: View {
                             .foregroundStyle(.tertiary)
                     }
                 }
+                .padding(DesignTokens.Spacing.s)
                 .contentShape(Rectangle())
                 .onTapGesture { onToggle?() }
             }
             if isExpanded {
-                content()
+                VStack(alignment: .leading, spacing: DesignTokens.Spacing.s) {
+                    content()
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, DesignTokens.Spacing.s)
+                .padding(.bottom, DesignTokens.Spacing.s)
+                .padding(.top, title == nil ? DesignTokens.Spacing.s : 0)
             }
         }
-        .padding(DesignTokens.Spacing.s)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+        // Hovering anywhere over a collapsible category lifts the whole block.
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color.primary.opacity(blockHover && onToggle != nil ? 0.06 : 0))
+                )
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .onHover { blockHover = $0 }
+        .animation(.easeOut(duration: 0.12), value: blockHover)
     }
 }
 
@@ -785,7 +882,7 @@ private struct InlineSettingsView: View {
                     }
                     .font(labelFont)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(BorderedHoverButtonStyle())
                 .popover(isPresented: $showShortcutPicker, arrowEdge: .trailing) {
                     VStack(alignment: .leading, spacing: 6) {
                         ForEach(HotkeyChoice.allCases) { choice in
@@ -813,7 +910,7 @@ private struct InlineSettingsView: View {
                             Button("Open Keyboard Settings") {
                                 NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!)
                             }
-                            .buttonStyle(.link)
+                            .buttonStyle(LinkHoverButtonStyle())
                         }
                     }
                     .font(labelFont)
@@ -902,7 +999,7 @@ private struct InlineSettingsView: View {
                     } label: {
                         Text(updater.isChecking ? "Checking…" : "Check Now")
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(BorderedHoverButtonStyle())
                     .controlSize(.small)
                     .disabled(updater.isChecking)
                     Spacer()
@@ -935,7 +1032,7 @@ private struct InlineSettingsView: View {
                 Button("Show welcome screen again") {
                     OnboardingPresenter.shared.show()
                 }
-                .buttonStyle(.link)
+                .buttonStyle(LinkHoverButtonStyle())
                 .font(labelFont)
             }
 
@@ -1095,10 +1192,10 @@ private struct InlineSettingsView: View {
                     }
 
                     HStack(alignment: .top, spacing: 6) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
-                        Text("May reduce accuracy. If transcription quality drops, turn this off.")
-                            .foregroundStyle(.orange)
+                        Image(systemName: "info.circle")
+                            .foregroundStyle(.secondary)
+                        Text("Works best for single, distinctive words (4+ letters). It only swaps a word when it's acoustically confident, so it rarely affects other text.")
+                            .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .font(labelFont)
@@ -1115,10 +1212,21 @@ private struct InlineSettingsView: View {
                     Button { addWord() } label: {
                         Image(systemName: "plus.circle.fill")
                     }
-                    .disabled(newTo.isEmpty)
-                    .buttonStyle(.plain)
+                    .disabled(newTo.isEmpty || tooShortBoostWord)
+                    .buttonStyle(IconHoverButtonStyle())
                 }
                 .font(labelFont)
+
+                if tooShortBoostWord {
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        Text("Boost-only words need 4+ letters — shorter ones are ignored by the model. Add a “Wrong” word to make it an exact replacement instead.")
+                            .foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .font(labelFont)
+                }
             }
 
             // Word list — outside SettingsCard so @Observable triggers correctly
@@ -1127,15 +1235,14 @@ private struct InlineSettingsView: View {
             }
 
             HStack {
-                Text("Stenote on GitHub →")
-                    .foregroundStyle(.secondary)
-                    .contentShape(Rectangle())
-                    .pointerStyle(.link)
-                    .onTapGesture {
-                        if let url = URL(string: "https://github.com/youngpilot/Stenote") {
-                            NSWorkspace.shared.open(url)
-                        }
+                Button {
+                    if let url = URL(string: "https://github.com/youngpilot/Stenote") {
+                        NSWorkspace.shared.open(url)
                     }
+                } label: {
+                    Text("Stenote on GitHub →")
+                }
+                .buttonStyle(LinkHoverButtonStyle())
                 Spacer()
                 Text("Stenote v\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
                     .foregroundStyle(.quaternary)
@@ -1176,8 +1283,15 @@ private struct InlineSettingsView: View {
         }
     }
 
+    /// A boost-only entry (no "Wrong") under 4 letters: FluidAudio's rescorer
+    /// skips terms this short, so adding it would do nothing.
+    private var tooShortBoostWord: Bool {
+        newFrom.trimmingCharacters(in: .whitespaces).isEmpty
+            && (1...3).contains(newTo.trimmingCharacters(in: .whitespaces).count)
+    }
+
     private func addWord() {
-        guard !newTo.isEmpty else { return }
+        guard !newTo.isEmpty, !tooShortBoostWord else { return }
         if newFrom.isEmpty {
             replacementService.addBoostWord(newTo)
         } else {
@@ -1221,6 +1335,7 @@ private struct WordPillsView: View {
 private struct WordPill: View {
     let label: String
     let onRemove: () -> Void
+    @State private var xHover = false
 
     var body: some View {
         HStack(spacing: 6) {
@@ -1229,12 +1344,13 @@ private struct WordPill: View {
             Button { onRemove() } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(xHover ? .primary : .secondary)
                     .frame(width: 18, height: 18)
-                    .background(.quaternary, in: Circle())
+                    .background(Color.primary.opacity(xHover ? 0.28 : 0.16), in: Circle())
             }
             .buttonStyle(.plain)
             .contentShape(Circle().inset(by: -4))
+            .onHover { xHover = $0 }
         }
         .font(.body)
         .padding(.leading, 10)

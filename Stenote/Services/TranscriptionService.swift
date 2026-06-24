@@ -107,11 +107,13 @@ final class TranscriptionService {
         let boostWords = textReplacement.boostWords
         guard !brandNames.isEmpty || !boostWords.isEmpty else { return [] }
 
+        // Note: FluidAudio ignores the per-term `weight` field — boosting strength
+        // is a global, length-adaptive constant inside the rescorer — so we omit it.
         var terms = brandNames.map { from, to in
-            CustomVocabularyTerm(text: to, weight: 10.0, aliases: [from])
+            CustomVocabularyTerm(text: to, aliases: [from])
         }
         terms += boostWords.map { word in
-            CustomVocabularyTerm(text: word, weight: 10.0)
+            CustomVocabularyTerm(text: word)
         }
         return terms
     }
