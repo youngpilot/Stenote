@@ -294,9 +294,8 @@ final class TranscriptionService {
 
                 let trimmed = finalText.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !trimmed.isEmpty {
-                    var corrected = textReplacement.applyReplacements(to: trimmed)
+                    var corrected = postProcess(trimmed)
                     corrected = removeTrailingStutter(corrected)
-                    corrected = voiceCommands.process(corrected)
 
                     let recognizer = NLLanguageRecognizer()
                     recognizer.processString(corrected)
@@ -325,6 +324,13 @@ final class TranscriptionService {
         streamingAsr = nil
     }
 
+    /// Replacements + (if enabled) voice commands + emoji — the shared text
+    /// pipeline applied to BOTH the streaming confirmed text and the final
+    /// result, so the final paste delta lines up with what streaming pasted.
+    private func postProcess(_ text: String) -> String {
+        voiceCommands.process(textReplacement.applyReplacements(to: text))
+    }
+
     /// Detect and remove ASR stutter where the last 1-2 words are repeated.
     /// e.g. "hello world world" → "hello world"
     private func removeTrailingStutter(_ text: String) -> String {
@@ -336,9 +342,12 @@ final class TranscriptionService {
 
         // Check 2-word stutter first: "... w1 w2 w1 w2"
         if words.count >= 4 {
-            let tail = words.suffix(2).map { normalize($0) }
+            let tailOriginal = Array(words.suffix(2))
+            let tail = tailOriginal.map { normalize($0) }
             let before = words.dropLast(2).suffix(2).map { normalize($0) }
-            if tail == before && tail.allSatisfy({ !$0.isEmpty }) {
+            // Keep capitalized repeats — likely a real proper noun ("New York, New York").
+            let looksLikeProperNoun = tailOriginal.allSatisfy { $0.first?.isUppercase == true }
+            if tail == before, tail.allSatisfy({ !$0.isEmpty }), !looksLikeProperNoun {
                 logger.info("Stutter removed (2-word): '\(words.suffix(2).joined(separator: " "))'")
                 return words.dropLast(2).joined(separator: " ")
             }
@@ -372,7 +381,7 @@ final class TranscriptionService {
             avgTokenConfidence = confidences.reduce(0, +) / Float(confidences.count)
         }
 
-        let corrected = textReplacement.applyReplacements(to: rawText)
+        let corrected = postProcess(rawText)
 
         if update.isConfirmed {
             lastConfirmedText = corrected

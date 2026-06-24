@@ -202,6 +202,11 @@ final class SettingsStore {
         didSet { UserDefaults.standard.set(enableVoiceCommands, forKey: "enableVoiceCommands") }
     }
 
+    /// "<word> emoji" / "emoji <word>" → a fitting emoji (curated, on-device).
+    var enableEmojiCommands: Bool {
+        didSet { UserDefaults.standard.set(enableEmojiCommands, forKey: "enableEmojiCommands") }
+    }
+
     var updateCheckMode: UpdateCheckMode {
         didSet { UserDefaults.standard.set(updateCheckMode.rawValue, forKey: "updateCheckMode") }
     }
@@ -235,6 +240,7 @@ final class SettingsStore {
         enableVocabBoosting = false
         insertionMode = .auto
         enableVoiceCommands = false
+        enableEmojiCommands = false
         updateCheckMode = .manual
         historyPreviewLines = 3
         historyLength = .twenty
@@ -271,6 +277,7 @@ final class SettingsStore {
         self.enableVocabBoosting = ud.object(forKey: "enableVocabBoosting") == nil ? false : ud.bool(forKey: "enableVocabBoosting")
         self.insertionMode = InsertionMode(rawValue: ud.string(forKey: "insertionMode") ?? "") ?? .auto
         self.enableVoiceCommands = ud.bool(forKey: "enableVoiceCommands")
+        self.enableEmojiCommands = ud.bool(forKey: "enableEmojiCommands")
         self.updateCheckMode = UpdateCheckMode(rawValue: ud.string(forKey: "updateCheckMode") ?? "") ?? .manual
         self.hasCompletedOnboarding = ud.bool(forKey: "hasCompletedOnboarding")
         self.historyPreviewLines = ud.object(forKey: "historyPreviewLines") == nil ? 3 : ud.integer(forKey: "historyPreviewLines")

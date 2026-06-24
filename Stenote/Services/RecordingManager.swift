@@ -25,6 +25,7 @@ final class RecordingManager {
     private(set) var audioLevel: Float = 0.0
     private(set) var waveformSamples: [Float] = []
     private(set) var needsAccessibility = false
+    private(set) var needsMicrophone = false
     private var recordingStartTime: Date?
     private var sampleRingBuffer = RingBuffer<Float>(capacity: 16000 * 3, defaultValue: 0)
 
@@ -72,6 +73,8 @@ final class RecordingManager {
         hotkeyService.start()
         outputService.startTrackingAppActivations()
         needsAccessibility = !AXIsProcessTrusted()
+        let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+        needsMicrophone = (micStatus == .denied || micStatus == .restricted)
         isModelLoading = true
         modelLoadError = nil
         do {
@@ -99,6 +102,12 @@ final class RecordingManager {
 
     func startRecording() {
         guard !isRecording, transcriptionService.isModelLoaded else { return }
+
+        let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+        if micStatus == .denied || micStatus == .restricted {
+            needsMicrophone = true
+            return
+        }
 
         outputService.rememberSourceApp()
 
@@ -139,6 +148,7 @@ final class RecordingManager {
             isRecording = true
             recordingStartTime = Date()
             needsAccessibility = !AXIsProcessTrusted()
+            needsMicrophone = false
             SoundFeedback.playStart()
 
             if SettingsStore.shared.silenceMediaWhileRecording {
@@ -154,6 +164,10 @@ final class RecordingManager {
                 outputService.insertText(prefix + " ")
             }
         } catch {
+            if case AudioCaptureError.microphoneDenied = error {
+                let status = AVCaptureDevice.authorizationStatus(for: .audio)
+                needsMicrophone = (status == .denied || status == .restricted)
+            }
             logger.error("Failed to start capture: \(error.localizedDescription)")
         }
     }
@@ -204,6 +218,14 @@ final class RecordingManager {
             if i == 29 {
                 logger.warning("Paste drain timeout — ending session anyway")
             }
+        }
+
+        // If Accessibility is off we couldn't type anywhere — leave the transcript
+        // on the clipboard so the user can paste it, and keep it there (don't restore).
+        if !finalText.isEmpty, !AXIsProcessTrusted() {
+            outputService.suppressClipboardRestore = true
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(finalText, forType: .string)
         }
 
         outputService.endSession()

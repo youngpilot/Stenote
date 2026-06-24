@@ -109,6 +109,7 @@ struct MenuBarView: View {
             }
             .keyboardShortcut(",", modifiers: .command)
             .buttonStyle(PopoverButtonStyle())
+            .accessibilityLabel("Settings")
 
             Button {
                 NSApplication.shared.terminate(nil)
@@ -119,6 +120,7 @@ struct MenuBarView: View {
             }
             .keyboardShortcut("q", modifiers: .command)
             .buttonStyle(PopoverButtonStyle())
+            .accessibilityLabel("Quit Stenote")
         }
 
         // Model loading progress
@@ -157,6 +159,31 @@ struct MenuBarView: View {
             .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.red.opacity(0.3), lineWidth: 0.5))
         }
 
+        // Microphone permission warning
+        if recordingManager.needsMicrophone {
+            HStack(spacing: 6) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Microphone access needed")
+                        .font(.body)
+                        .fontWeight(.medium)
+                    Text("Stenote can't hear you until you allow the microphone.")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("Grant") {
+                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!)
+                }
+                .font(.body)
+                .controlSize(.small)
+            }
+            .padding(DesignTokens.Spacing.s)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.orange.opacity(0.3), lineWidth: 0.5))
+        }
+
         // Accessibility permission warning
         if recordingManager.needsAccessibility {
             HStack(spacing: 6) {
@@ -186,6 +213,7 @@ struct MenuBarView: View {
         if recordingManager.isRecording {
             // Waveform visualization
             WaveformView(samples: recordingManager.waveformSamples, isRecording: recordingManager.isRecording)
+                .accessibilityHidden(true)
 
             if !recordingManager.currentText.isEmpty {
                 Button {
@@ -323,6 +351,7 @@ struct MenuBarView: View {
                 .buttonStyle(BorderedHoverButtonStyle())
                 .controlSize(.regular)
                 .help("Reset to Defaults")
+                .accessibilityLabel("Reset to defaults")
             }
         }
 
@@ -426,6 +455,7 @@ struct MenuBarView: View {
                 .buttonStyle(BorderedHoverButtonStyle())
                 .controlSize(.regular)
                 .disabled(safePage == 0)
+                .accessibilityLabel("Previous recordings")
 
                 Text("\(safePage + 1)/\(totalPages)")
                     .font(.body)
@@ -440,6 +470,7 @@ struct MenuBarView: View {
                 .buttonStyle(BorderedHoverButtonStyle())
                 .controlSize(.regular)
                 .disabled(safePage >= totalPages - 1)
+                .accessibilityLabel("Next recordings")
             }
 
             Spacer()
@@ -1138,6 +1169,19 @@ private struct InlineSettingsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
+                Toggle("Emoji by Voice", isOn: Binding(
+                    get: { settings.enableEmojiCommands },
+                    set: { settings.enableEmojiCommands = $0 }
+                ))
+                .font(labelFont)
+
+                if settings.enableEmojiCommands {
+                    Text("Say a word next to \"emoji\" — e.g. \"smile emoji\" → 😊, \"emoji fire\" → 🔥. Curated, on-device.")
+                        .font(labelFont)
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
                 settingsRow("Prefix") {
                     TextField("", text: Binding(
                         get: { settings.prefixText },
@@ -1351,6 +1395,7 @@ private struct WordPill: View {
             .buttonStyle(.plain)
             .contentShape(Circle().inset(by: -4))
             .onHover { xHover = $0 }
+            .accessibilityLabel("Remove word")
         }
         .font(.body)
         .padding(.leading, 10)

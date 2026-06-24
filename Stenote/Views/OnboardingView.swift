@@ -151,7 +151,7 @@ struct OnboardingView: View {
             permissionRow(
                 icon: "accessibility",
                 title: "Accessibility",
-                desc: "To type the text into other apps and to use the global shortcut.",
+                desc: "To type text into other apps and use the global shortcut. After you click Allow, enable Stenote in the list that opens.",
                 granted: axGranted,
                 action: requestAX
             )

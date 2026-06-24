@@ -20,7 +20,7 @@ Stenote is a native menubar app that turns your voice into text in any app. Spea
 | **Languages** | 🟢 25, auto-detected, mixable | 🟡 Manual switch | 🟢 100+ (cloud) | 🟡 Per-model / manual |
 | **Accuracy** | 🟢 Parakeet TDT, low hallucination | 🔴 Cutoffs, no custom vocab | 🟢 Strong (cloud) | 🟡 Whisper hallucinates on silence |
 | **Mute / pause music while recording** | 🟢 Mutes output + pauses Spotify/Music | 🔴 None | 🟡 Mutes output only | 🟡 superwhisper yes, MacWhisper no |
-| **Footprint** | 🟡 16 MB app + ~460 MB model, then offline | 🟢 Built in | 🟡 Tiny, but always online | 🔴 ~1.5 GB models |
+| **Footprint** | 🟡 ~17 MB app + ~460 MB model, then offline | 🟢 Built in | 🟡 Tiny, but always online | 🔴 ~1.5 GB models |
 | **Design** | 🟢 Minimal menubar | 🟡 System feature | 🟢 Polished, AI commands | 🟡 Power features |
 
 ¹ superwhisper, MacWhisper.  ·  Legend: 🟢 strength · 🟡 mixed · 🔴 limiting
@@ -36,6 +36,7 @@ In short: Apple Dictation is private but weak, Wispr Flow is polished but cloud 
 - **Word corrections** — custom replacements for names and jargon, with optional model boosting.
 - **History** — click any entry to copy; length configurable, from none to unlimited.
 - **Smart clipboard** — uses a concealed type so clipboard managers ignore pastes, and restores your clipboard afterward.
+- **Voice commands** — say "period", "comma", "new line" for punctuation, or turn on emoji-by-voice ("smile emoji" → 😊). Opt-in, curated, on-device.
 - **Also** — auto-stop on silence, paragraph breaks, prefix/suffix text, launch at login, menubar-only (no dock icon).
 - **Updates** — *Manual* (no network calls, the default) or *Daily* (one lightweight GitHub check). No account, no telemetry.
 - **Guided setup** — a first-run welcome covers permissions, your shortcut, and preferences in a few steps.
@@ -48,7 +49,7 @@ English, German, French, Spanish, Italian, Portuguese, Dutch, Polish, Czech, Rom
 
 ## Install
 
-1. Download `Stenote-0.8.3.dmg` from the [latest release](https://github.com/youngpilot/Stenote/releases/latest).
+1. Download `Stenote-0.8.4.dmg` from the [latest release](https://github.com/youngpilot/Stenote/releases/latest).
 2. Open it, drag **Stenote** to Applications, and launch.
 3. Grant **Microphone** and **Accessibility** when prompted. The speech model (~460 MB) downloads once, then runs fully offline.
 
@@ -71,7 +72,11 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
   xcodebuild -project Stenote.xcodeproj -scheme Stenote -configuration Debug build
 ```
 
-The FluidAudio package resolves automatically; models download on first launch. For a signed build, set your own Apple Developer Team in *Signing & Capabilities*.
+The FluidAudio package resolves automatically; models download on first launch. The committed project pins a `DEVELOPMENT_TEAM`, so when building from the command line set your own (`xcodebuild … DEVELOPMENT_TEAM=YOURTEAMID`) or pass `CODE_SIGNING_ALLOWED=NO`; opening in Xcode and picking your team in *Signing & Capabilities* also works.
+
+## Privacy & data
+
+Everything runs on your Mac — audio is transcribed on the Neural Engine and never leaves the device, and the only network request is the optional GitHub update check (off by default). For transparency: your **history**, **word corrections**, and **prefix/suffix** text are stored unencrypted in local app preferences (`~/Library/Preferences/com.youngpilot.Stenote.plist`). History keeps the last 20 entries by default — set it to **None** or clear it any time from Settings, and **Reset to Defaults** wipes corrections and prefixes.
 
 > `StenoteIM/` is an experimental, not-yet-wired-in system-wide input method — optional, not needed to build or run Stenote.
 

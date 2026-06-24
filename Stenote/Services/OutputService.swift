@@ -33,8 +33,11 @@ final class OutputService {
     private var isSessionActive = false
     /// Guard against overlapping paste operations
     private var isPasting = false
-    /// Saved clipboard contents to restore after paste
+    /// Saved clipboard contents to restore after paste (full items, all types)
     private var savedPasteboardItems: [NSPasteboardItem]?
+    /// When set, skip restoring the clipboard at end of session (e.g. paste was
+    /// blocked, so we intentionally leave the transcript on the clipboard).
+    var suppressClipboardRestore = false
 
     /// The last non-Stenote app that was frontmost
     private var previousApp: NSRunningApplication?
@@ -74,6 +77,7 @@ final class OutputService {
     func rememberSourceApp() {
         isSessionActive = true
         targetLocked = false
+        suppressClipboardRestore = false
 
         let frontmost = NSWorkspace.shared.frontmostApplication
         if frontmost?.bundleIdentifier == ownBundleID {
@@ -87,10 +91,23 @@ final class OutputService {
         isSessionActive = false
         targetLocked = false
         sourceApp = nil
-        logger.info("Session ended — restoring clipboard in 750ms")
-        // Delay restore so the last Cmd+V has time to be read by the target app
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.75) { [weak self] in
-            self?.restorePasteboard()
+        // Restore once pasting is actually idle (instead of a fixed timer that can
+        // race a slow paste and clobber the target with the old clipboard).
+        scheduleRestoreWhenIdle(attempt: 0)
+    }
+
+    private func scheduleRestoreWhenIdle(attempt: Int) {
+        guard !suppressClipboardRestore else { return }
+        if !hasPendingOutput || attempt >= 20 {
+            // Give the last ⌘V a moment to be read by the target, then restore.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+                guard let self, !self.suppressClipboardRestore else { return }
+                self.restorePasteboard()
+            }
+        } else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+                self?.scheduleRestoreWhenIdle(attempt: attempt + 1)
+            }
         }
     }
 
@@ -113,10 +130,6 @@ final class OutputService {
     }
 
     private static let concealedType = NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType")
-
-    /// Saved clipboard string to restore after session
-    private var savedClipboardString: String?
-    private var savedClipboardChangeCount: Int = 0
 
     private func doPaste(to app: NSRunningApplication) {
         guard !pendingText.isEmpty else {
@@ -159,11 +172,17 @@ final class OutputService {
 
         let pasteboard = NSPasteboard.general
 
-        // Save clipboard once per session (just the string — fast)
+        // Snapshot the FULL clipboard once per session (every item + type) so we
+        // restore images/files/RTF too — not just plain text. Copy eagerly; the
+        // originals are invalidated by clearContents().
         if savedPasteboardItems == nil {
-            savedClipboardString = pasteboard.string(forType: .string)
-            savedClipboardChangeCount = pasteboard.changeCount
-            savedPasteboardItems = [] // Mark as saved
+            savedPasteboardItems = (pasteboard.pasteboardItems ?? []).compactMap { item in
+                let copy = NSPasteboardItem()
+                for type in item.types {
+                    if let data = item.data(forType: type) { copy.setData(data, forType: type) }
+                }
+                return copy.types.isEmpty ? nil : copy
+            }
         }
 
         // Write text with concealed flag so clipboard managers ignore it
@@ -199,16 +218,13 @@ final class OutputService {
         }
     }
 
-    /// Restore the clipboard to what it was before we used it
+    /// Restore the clipboard to exactly what it was before we used it.
     private func restorePasteboard() {
-        guard savedPasteboardItems != nil else { return }
-        if let saved = savedClipboardString {
-            let pasteboard = NSPasteboard.general
-            pasteboard.clearContents()
-            pasteboard.setString(saved, forType: .string)
-        }
+        guard let items = savedPasteboardItems else { return }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        if !items.isEmpty { pasteboard.writeObjects(items) }
         savedPasteboardItems = nil
-        savedClipboardString = nil
     }
 
     var hasPendingOutput: Bool {
@@ -227,12 +243,15 @@ final class OutputService {
         }
 
         let source = CGEventSource(stateID: .hidSystemState)
-        for scalar in text.unicodeScalars {
-            var char = UniChar(scalar.value)
+        // Per grapheme, encoded as UTF-16 — so characters above U+FFFF (emoji,
+        // some CJK) go out as a surrogate pair instead of trapping `UniChar`.
+        for character in text {
+            var utf16 = Array(character.utf16)
+            guard !utf16.isEmpty else { continue }
             let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true)
             let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false)
-            keyDown?.keyboardSetUnicodeString(stringLength: 1, unicodeString: &char)
-            keyUp?.keyboardSetUnicodeString(stringLength: 1, unicodeString: &char)
+            keyDown?.keyboardSetUnicodeString(stringLength: utf16.count, unicodeString: &utf16)
+            keyUp?.keyboardSetUnicodeString(stringLength: utf16.count, unicodeString: &utf16)
             keyDown?.post(tap: .cgAnnotatedSessionEventTap)
             keyUp?.post(tap: .cgAnnotatedSessionEventTap)
         }
