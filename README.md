@@ -49,7 +49,7 @@ English, German, French, Spanish, Italian, Portuguese, Dutch, Polish, Czech, Rom
 
 ## Install
 
-1. Download `Stenote-0.8.4.dmg` from the [latest release](https://github.com/youngpilot/Stenote/releases/latest).
+1. Download `Stenote-0.8.5.dmg` from the [latest release](https://github.com/youngpilot/Stenote/releases/latest).
 2. Open it, drag **Stenote** to Applications, and launch.
 3. Grant **Microphone** and **Accessibility** when prompted. The speech model (~460 MB) downloads once, then runs fully offline.
 
