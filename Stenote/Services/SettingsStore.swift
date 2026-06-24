@@ -10,6 +10,8 @@ enum AutoStopOption: Int, CaseIterable, Identifiable {
     case twenty = 20
     case thirty = 30
     case sixty = 60
+    case twoMin = 120
+    case fiveMin = 300
     case off = 0
 
     var id: Int { rawValue }
@@ -19,7 +21,9 @@ enum AutoStopOption: Int, CaseIterable, Identifiable {
         case .ten: "10s"
         case .twenty: "20s"
         case .thirty: "30s"
-        case .sixty: "60s"
+        case .sixty: "1 min"
+        case .twoMin: "2 min"
+        case .fiveMin: "5 min"
         case .off: "Off"
         }
     }
@@ -202,6 +206,11 @@ final class SettingsStore {
         didSet { UserDefaults.standard.set(enableVoiceCommands, forKey: "enableVoiceCommands") }
     }
 
+    /// Which individual voice commands are active (when `enableVoiceCommands` is on).
+    var enabledVoiceCommandIDs: Set<String> {
+        didSet { UserDefaults.standard.set(Array(enabledVoiceCommandIDs), forKey: "enabledVoiceCommandIDs") }
+    }
+
     /// "<word> emoji" / "emoji <word>" → a fitting emoji (curated, on-device).
     var enableEmojiCommands: Bool {
         didSet { UserDefaults.standard.set(enableEmojiCommands, forKey: "enableEmojiCommands") }
@@ -219,6 +228,11 @@ final class SettingsStore {
         didSet { UserDefaults.standard.set(historyPreviewLines, forKey: "historyPreviewLines") }
     }
 
+    /// How many recordings show per page in the menubar history (1…10).
+    var historyPageSize: Int {
+        didSet { UserDefaults.standard.set(historyPageSize, forKey: "historyPageSize") }
+    }
+
     var historyLength: HistoryLength {
         didSet { UserDefaults.standard.set(historyLength.rawValue, forKey: "historyLength") }
     }
@@ -234,15 +248,17 @@ final class SettingsStore {
         politenessMode = false
         prefixText = ""
         suffixText = ""
-        autoStopTimeout = .thirty
+        autoStopTimeout = .sixty
         silenceMediaWhileRecording = true
         pauseMediaApps = true
         enableVocabBoosting = false
         insertionMode = .auto
         enableVoiceCommands = false
+        enabledVoiceCommandIDs = Set(VoiceCommandID.allCases.map(\.rawValue))
         enableEmojiCommands = false
         updateCheckMode = .manual
         historyPreviewLines = 3
+        historyPageSize = 5
         historyLength = .twenty
         exportDirectory = SettingsStore.defaultDownloadsPath
     }
@@ -262,8 +278,8 @@ final class SettingsStore {
         self.suffixText = ud.string(forKey: "suffixText") ?? ""
         self.prefixText = ud.string(forKey: "prefixText") ?? ""
         self.autoStopTimeout = {
-            if ud.object(forKey: "autoStopTimeout") == nil { return .thirty }
-            return AutoStopOption(rawValue: ud.integer(forKey: "autoStopTimeout")) ?? .thirty
+            if ud.object(forKey: "autoStopTimeout") == nil { return .sixty }
+            return AutoStopOption(rawValue: ud.integer(forKey: "autoStopTimeout")) ?? .sixty
         }()
         // New key wins; else migrate the old picker (.none → off, otherwise on); else default on.
         if ud.object(forKey: "silenceMediaWhileRecording") != nil {
@@ -277,10 +293,13 @@ final class SettingsStore {
         self.enableVocabBoosting = ud.object(forKey: "enableVocabBoosting") == nil ? false : ud.bool(forKey: "enableVocabBoosting")
         self.insertionMode = InsertionMode(rawValue: ud.string(forKey: "insertionMode") ?? "") ?? .auto
         self.enableVoiceCommands = ud.bool(forKey: "enableVoiceCommands")
+        self.enabledVoiceCommandIDs = (ud.array(forKey: "enabledVoiceCommandIDs") as? [String]).map(Set.init)
+            ?? Set(VoiceCommandID.allCases.map(\.rawValue))
         self.enableEmojiCommands = ud.bool(forKey: "enableEmojiCommands")
         self.updateCheckMode = UpdateCheckMode(rawValue: ud.string(forKey: "updateCheckMode") ?? "") ?? .manual
         self.hasCompletedOnboarding = ud.bool(forKey: "hasCompletedOnboarding")
         self.historyPreviewLines = ud.object(forKey: "historyPreviewLines") == nil ? 3 : ud.integer(forKey: "historyPreviewLines")
+        self.historyPageSize = ud.object(forKey: "historyPageSize") == nil ? 5 : ud.integer(forKey: "historyPageSize")
         self.historyLength = ud.object(forKey: "historyLength") == nil ? .twenty : (HistoryLength(rawValue: ud.integer(forKey: "historyLength")) ?? .twenty)
         self.exportDirectory = ud.string(forKey: "exportDirectory") ?? SettingsStore.defaultDownloadsPath
     }

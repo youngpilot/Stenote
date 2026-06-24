@@ -4,144 +4,119 @@ import os
 
 private let logger = Logger(subsystem: "com.youngpilot.Stenote", category: "AudioCapture")
 
+/// Captures microphone audio as 16 kHz mono for the ASR.
+///
+/// The `AVAudioEngine` is created once and reused for the app's lifetime: it's
+/// warmed up ahead of time so the first start is fast and every later start is
+/// near-instant. The mic is only live between `startCapture()` and
+/// `stopCapture()` — there is no always-on microphone (or always-on indicator).
 final class AudioCaptureService: @unchecked Sendable {
-    private var audioEngine: AVAudioEngine?
-    private var converter: AVAudioConverter?
-    private var configObserver: NSObjectProtocol?
+    private let engine = AVAudioEngine()
+    private let targetFormat = AVAudioFormat(
+        commonFormat: .pcmFormatFloat32, sampleRate: 16000, channels: 1, interleaved: false)!
 
-    // Stored so we can rebuild the tap when the input device/format changes.
+    private var converter: AVAudioConverter?
+    private var tapFormat: AVAudioFormat?
+    private var active = false
+
+    // Per-recording sinks; the tap forwards to them only while `active`.
     private var onBuffer: (@Sendable (AVAudioPCMBuffer) -> Void)?
     private var onLevel: (@Sendable (Float) -> Void)?
     private var onSamples: (@Sendable ([Float]) -> Void)?
 
+    /// Allocate engine resources ahead of time (no mic I/O, no indicator) so the
+    /// first real start is fast. Call once at launch, only when mic is granted.
+    func prepareEngine() {
+        refreshTapIfNeeded()
+        engine.prepare()
+        logger.debug("Engine prepared")
+    }
+
+    /// Begin forwarding mic audio to the sinks. Fast on a warm engine. Throws
+    /// `microphoneDenied` so the caller can surface the warning card.
     func startCapture(
         onBuffer: @escaping @Sendable (AVAudioPCMBuffer) -> Void,
         onLevel: @escaping @Sendable (Float) -> Void,
         onSamples: @escaping @Sendable ([Float]) -> Void
     ) throws {
-        let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
-        logger.debug("Mic permission status: \(micStatus.rawValue, privacy: .public)")
-        switch micStatus {
-        case .denied, .restricted:
-            throw AudioCaptureError.microphoneDenied
-        case .notDetermined:
-            // First use: kick off the prompt, but don't capture silence this round —
-            // the caller surfaces "grant microphone" and the next press will work.
+        let status = AVCaptureDevice.authorizationStatus(for: .audio)
+        logger.debug("Mic permission status: \(status.rawValue, privacy: .public)")
+        if status == .denied || status == .restricted { throw AudioCaptureError.microphoneDenied }
+        if status == .notDetermined {
             AVCaptureDevice.requestAccess(for: .audio) { granted in
                 logger.debug("Mic permission granted: \(granted, privacy: .public)")
             }
             throw AudioCaptureError.microphoneDenied
-        default:
-            break
         }
 
         self.onBuffer = onBuffer
         self.onLevel = onLevel
         self.onSamples = onSamples
 
-        let engine = AVAudioEngine()
-        audioEngine = engine
-        try installTap(on: engine)
-        engine.prepare()
-        try engine.start()
-
-        // Rebuild the tap when the input device changes mid-recording (AirPods
-        // unplugged, interface docked) — otherwise capture silently dies.
-        configObserver = NotificationCenter.default.addObserver(
-            forName: .AVAudioEngineConfigurationChange, object: engine, queue: nil
-        ) { [weak self] _ in
-            self?.handleConfigurationChange()
+        refreshTapIfNeeded()
+        active = true
+        if !engine.isRunning {
+            engine.prepare()
+            try engine.start()
         }
     }
 
-    private func installTap(on engine: AVAudioEngine) throws {
-        let inputNode = engine.inputNode
-        let inputFormat = inputNode.outputFormat(forBus: 0)
-        logger.debug("Input format: \(inputFormat.description, privacy: .public)")
+    func stopCapture() {
+        active = false
+        if engine.isRunning { engine.stop() }   // mic off; engine kept warm for next time
+    }
 
-        // Target format: 16kHz mono for Parakeet
-        guard let targetFormat = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32, sampleRate: 16000, channels: 1, interleaved: false
-        ) else { throw AudioCaptureError.formatError }
+    /// (Re)install the tap if it's missing or the input format changed since last
+    /// time (e.g. the user switched audio device between recordings). Only ever
+    /// called while stopped/starting — never mid-recording.
+    private func refreshTapIfNeeded() {
+        let input = engine.inputNode
+        let inputFormat = input.outputFormat(forBus: 0)
+        guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0 else { return } // no device yet
+        if converter != nil, tapFormat == inputFormat { return }
 
+        input.removeTap(onBus: 0)
         guard let conv = AVAudioConverter(from: inputFormat, to: targetFormat) else {
-            throw AudioCaptureError.converterError
+            logger.error("Failed to create audio converter")
+            converter = nil
+            tapFormat = nil
+            return
         }
         converter = conv
-
-        inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
-            self?.process(buffer, with: conv, inputFormat: inputFormat, targetFormat: targetFormat)
+        tapFormat = inputFormat
+        let target = targetFormat
+        input.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
+            self?.handleTap(buffer, inputFormat: inputFormat, targetFormat: target)
         }
+        logger.debug("Tap installed @ \(inputFormat.description, privacy: .public)")
     }
 
-    private func handleConfigurationChange() {
-        guard let engine = audioEngine else { return }
-        logger.info("Audio engine configuration changed — rebuilding tap")
-        engine.inputNode.removeTap(onBus: 0)
-        do {
-            try installTap(on: engine)
-            if !engine.isRunning { try engine.start() }
-        } catch {
-            logger.error("Failed to rebuild tap after device change: \(error.localizedDescription, privacy: .public)")
-        }
-    }
-
-    private func process(
-        _ buffer: AVAudioPCMBuffer, with conv: AVAudioConverter,
-        inputFormat: AVAudioFormat, targetFormat: AVAudioFormat
-    ) {
-        let ratio = targetFormat.sampleRate / inputFormat.sampleRate
-        let frameCapacity = AVAudioFrameCount((Double(buffer.frameLength) * ratio).rounded(.up))
-        guard frameCapacity > 0,
-              let convertedBuffer = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: frameCapacity)
-        else { return }
+    private func handleTap(_ buffer: AVAudioPCMBuffer, inputFormat: AVAudioFormat, targetFormat: AVAudioFormat) {
+        guard active, let conv = converter else { return }
+        let frameCapacity = AVAudioFrameCount(
+            Double(buffer.frameLength) * targetFormat.sampleRate / inputFormat.sampleRate)
+        guard let converted = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: frameCapacity) else { return }
 
         var error: NSError?
-        var fed = false
-        conv.convert(to: convertedBuffer, error: &error) { _, outStatus in
-            // Feed this tap buffer exactly once per convert() call.
-            if fed {
-                outStatus.pointee = .noDataNow
-                return nil
-            }
-            fed = true
+        conv.convert(to: converted, error: &error) { _, outStatus in
             outStatus.pointee = .haveData
             return buffer
         }
+        guard error == nil else { return }
 
-        if let error {
-            logger.debug("Audio conversion error: \(error.localizedDescription, privacy: .public)")
-            return
-        }
-
-        if let floatData = convertedBuffer.floatChannelData {
-            let count = Int(convertedBuffer.frameLength)
+        if let floatData = converted.floatChannelData {
+            let count = Int(converted.frameLength)
             if count > 0 {
                 var rms: Float = 0
                 vDSP_rmsqv(floatData[0], 1, &rms, vDSP_Length(count))
-                // dB-like scale tuned for laptop mic speech:
-                // silence → 0, quiet → 0.4, normal → 0.7, loud → 1.0
+                // dB-like scale tuned for laptop mic speech.
                 let db = 20 * log10(max(rms, 1e-6))
                 let level = min(max((db + 55) / 40, 0), 1.0) // -55dB floor, -15dB ceiling
                 onLevel?(level)
                 onSamples?(Array(UnsafeBufferPointer(start: floatData[0], count: count)))
             }
         }
-        onBuffer?(convertedBuffer)
-    }
-
-    func stopCapture() {
-        if let configObserver {
-            NotificationCenter.default.removeObserver(configObserver)
-            self.configObserver = nil
-        }
-        audioEngine?.inputNode.removeTap(onBus: 0)
-        audioEngine?.stop()
-        audioEngine = nil
-        converter = nil
-        onBuffer = nil
-        onLevel = nil
-        onSamples = nil
+        onBuffer?(converted)
     }
 }
 

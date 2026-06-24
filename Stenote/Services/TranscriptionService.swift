@@ -33,16 +33,15 @@ final class TranscriptionService {
 
     // --- Streaming state ---
     private var lastConfirmedText = ""      // used for volatile preview diff
-    private var lastPastedConfirmedText = "" // delta tracking for incremental paste
     private var updateTask: Task<Void, Never>?
     private var isStopping = false          // guard against stale updates during finish()
+    private var isCapturing = false         // mic is live; hold audio until ASR is ready
+    private var pendingAudio: [AVAudioPCMBuffer] = []  // audio captured before asr.start()
 
-    // --- VAD state (auto-stop + paragraph breaks) ---
+    // --- VAD state (auto-stop) ---
     private var vadBuffer: [Float] = []
     private var vadStreamState: VadStreamState = .initial()
     private var lastSpeechTime: Date?
-    private var lastSpeechEndTime: Date?
-    private var pendingParagraphBreak = false
 
     // Language detection
     private(set) var detectedLanguage = ""
@@ -51,7 +50,6 @@ final class TranscriptionService {
     private(set) var minTokenConfidence: Float = 0
     private(set) var avgTokenConfidence: Float = 0
 
-    var onSegmentReady: ((String) -> Void)?
     var onSilenceTimeout: (() -> Void)?
 
     // MARK: - Model Loading
@@ -120,24 +118,27 @@ final class TranscriptionService {
 
     // MARK: - Start / Stop
 
-    func startTranscription() async {
-        guard isModelLoaded else { return }
-
-        // Reset state
+    /// Reset state and mark capture active — cheap and synchronous, so the mic
+    /// can start (and audio buffer) instantly. Then call startTranscription() to
+    /// spin up the ASR in the background.
+    func beginCapturing() {
         currentText = ""
         vadBuffer = []
         vadStreamState = .initial()
         lastSpeechTime = Date()
-        lastSpeechEndTime = nil
-        pendingParagraphBreak = false
         detectedLanguage = ""
+        pendingAudio = []
+        isCapturing = true
+    }
 
+    func startTranscription() async {
+        guard isModelLoaded, isCapturing else { return }
         await startStreaming()
-
         isTranscribing = true
     }
 
     func stopTranscription() async -> String {
+        isCapturing = false
         guard isTranscribing else { return currentText }
         await stopStreaming()
         isTranscribing = false
@@ -147,12 +148,15 @@ final class TranscriptionService {
     // MARK: - Audio Input
 
     func processAudioBuffer(_ buffer: AVAudioPCMBuffer) async {
-        guard isTranscribing else { return }
+        guard isCapturing else { return }
 
-        // Feed the streaming ASR engine
+        // Feed the streaming ASR — or hold the audio until it's ready, so the
+        // first words (captured before asr.start() finishes) aren't lost.
         if let asr = streamingAsr {
             nonisolated(unsafe) let sendableBuffer = buffer
             await asr.streamAudio(sendableBuffer)
+        } else {
+            pendingAudio.append(buffer)
         }
 
         // Extract samples for VAD (auto-stop + paragraph breaks)
@@ -195,18 +199,6 @@ final class TranscriptionService {
                     lastSpeechTime = Date()
                 }
 
-                if let event = result.event {
-                    switch event.kind {
-                    case .speechStart:
-                        if let lastEnd = lastSpeechEndTime,
-                           Date().timeIntervalSince(lastEnd) > 2.5 {
-                            pendingParagraphBreak = true
-                        }
-                    case .speechEnd:
-                        lastSpeechEndTime = Date()
-                    }
-                }
-
                 // Auto-stop after prolonged silence
                 let timeout = SettingsStore.shared.autoStopTimeout
                 if timeout != .off,
@@ -227,7 +219,6 @@ final class TranscriptionService {
         guard let asrModels else { return }
 
         lastConfirmedText = ""
-        lastPastedConfirmedText = ""
         isStopping = false
         minTokenConfidence = 0
         avgTokenConfidence = 0
@@ -270,6 +261,16 @@ final class TranscriptionService {
 
         streamingAsr = asr
 
+        // Feed any audio captured before the ASR finished starting.
+        if !pendingAudio.isEmpty {
+            let buffered = pendingAudio
+            pendingAudio = []
+            for buf in buffered {
+                nonisolated(unsafe) let sendable = buf
+                await asr.streamAudio(sendable)
+            }
+        }
+
         updateTask = Task { [weak self] in
             for await update in await asr.transcriptionUpdates {
                 await MainActor.run {
@@ -303,16 +304,9 @@ final class TranscriptionService {
                         detectedLanguage = String(lang.prefix(2))
                     }
 
+                    // Final, complete transcript. RecordingManager pastes it once.
                     currentText = corrected
-
-                    // Only paste the delta not yet pasted during streaming
-                    let delta = computeConfirmedDelta(old: lastPastedConfirmedText, new: corrected)
-                    logger.info("finish (\(corrected.count) chars, delta: \(delta.count)): \(corrected.prefix(120))…")
-                    if !delta.isEmpty {
-                        let prefix = pendingParagraphBreak ? "\n\n" : ""
-                        pendingParagraphBreak = false
-                        onSegmentReady?(prefix + delta)
-                    }
+                    logger.info("finish (\(corrected.count) chars): \(corrected.prefix(120))…")
                 } else {
                     logger.warning("finish() returned empty text!")
                 }
@@ -384,20 +378,9 @@ final class TranscriptionService {
         let corrected = postProcess(rawText)
 
         if update.isConfirmed {
+            // Update the live preview only — the full text is pasted once at stop.
             lastConfirmedText = corrected
             currentText = corrected
-            logger.info("Confirmed (\(corrected.count) chars, avg:\(String(format: "%.0f", self.avgTokenConfidence * 100))%): \(corrected.prefix(60))…")
-
-            // Incremental paste: only paste the delta since last paste
-            if corrected.count > lastPastedConfirmedText.count {
-                let delta = computeConfirmedDelta(old: lastPastedConfirmedText, new: corrected)
-                if !delta.isEmpty {
-                    let prefix = pendingParagraphBreak ? "\n\n" : ""
-                    pendingParagraphBreak = false
-                    onSegmentReady?(prefix + delta + " ")
-                    lastPastedConfirmedText = corrected
-                }
-            }
         } else {
             // Volatile — show as preview
             if corrected.hasPrefix(lastConfirmedText) {
@@ -408,29 +391,5 @@ final class TranscriptionService {
                 }
             }
         }
-    }
-
-    /// Word-level delta between old and new confirmed text.
-    /// Robust against re-punctuation ("world" → "world,").
-    private func computeConfirmedDelta(old: String, new: String) -> String {
-        guard !old.isEmpty else { return new }
-        let oldWords = old.split(separator: " ", omittingEmptySubsequences: true)
-        let newWords = new.split(separator: " ", omittingEmptySubsequences: true)
-
-        func normalize(_ word: Substring) -> String {
-            word.lowercased().filter { !$0.isPunctuation }
-        }
-
-        var matchCount = 0
-        for (o, n) in zip(oldWords, newWords) {
-            if normalize(o) == normalize(n) {
-                matchCount += 1
-            } else {
-                break
-            }
-        }
-
-        let remaining = newWords[matchCount...]
-        return remaining.joined(separator: " ")
     }
 }

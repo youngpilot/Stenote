@@ -5,19 +5,23 @@ All notable changes to Stenote. Dates are release dates; versions follow the app
 ## 0.8.4
 
 ### Added
-- **Emoji by voice** (opt-in) — say a word next to "emoji" to insert one, e.g. "smile emoji" → 😊, "emoji fire" → 🔥. Curated, on-device, no model.
+- **Instant start** — pressing the shortcut reacts immediately: amber mic icon + sound the moment it registers, while the (reused, pre-warmed) audio engine spins up. Audio captured during start-up is buffered and fed to the recognizer, so no words are lost.
+- **Whole-text paste at stop** — the complete transcript is inserted once when you finish, instead of word-by-word during recording. No more chunk-boundary glitches; the popover still shows a live preview.
+- **Individually toggleable voice commands** — turn New line / New paragraph / Period / Comma / Question mark / Exclamation / Colon / Semicolon on or off independently. Paragraph breaks are now the explicit "new paragraph" command (reliable with whole-text paste).
+- **Emoji by voice** (opt-in) — say a word next to "emoji", e.g. "smile emoji" → 😊, "emoji fire" → 🔥. Curated, on-device, no model.
 - **Microphone warning** in the menubar when access is denied, with a one-click Grant — instead of silently capturing nothing.
+- **Recordings per page** and a longer silence range (default 1 min, plus 2 min / 5 min).
 
 ### Fixed
 - **Crash** when typing characters above U+FFFF (emoji, some CJK) in direct-typing mode — now encoded as UTF-16.
-- **Voice commands** ("period", "comma", "new line") now take effect immediately and apply to streamed text, not only after a relaunch / on the final word.
-- **Recording no longer dies silently** when the input device changes mid-recording (AirPods unplugged, dock change) — the audio tap rebuilds.
-- **Clipboard is fully preserved** across a recording — images, files, and rich text are restored, not just plain text; restore waits for pasting to finish instead of racing a fixed timer.
+- **Media pause** (Spotify/Apple Music) runs off the main thread, so the first recording isn't delayed by the Automation prompt; the prompt is also front-loaded in onboarding.
+- **Recording no longer dies silently** on input-device changes; **clipboard fully preserved** (images/files/rich text) with restore gated on pasting completing.
 - If Accessibility is off, the transcript is left on the clipboard (and always saved to history) instead of vanishing.
 - "New York, New York" and similar real repetition is no longer trimmed as a stutter.
 
 ### Changed
 - VoiceOver labels on icon-only controls; clearer Accessibility-grant guidance in onboarding.
+- Removed the unreliable automatic pause-based paragraph break (use the "new paragraph" command).
 - README documents local data-at-rest and build-from-source signing.
 
 ## 0.8.3

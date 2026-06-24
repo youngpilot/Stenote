@@ -5,14 +5,69 @@
 import Foundation
 import Observation
 
+/// A spoken command that becomes text. Each one is individually toggleable.
+enum VoiceCommandID: String, CaseIterable, Identifiable {
+    case newParagraph, newLine, period, comma, questionMark, exclamationMark, colon, semicolon
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .newParagraph: "New paragraph"
+        case .newLine: "New line"
+        case .period: "Period  ."
+        case .comma: "Comma  ,"
+        case .questionMark: "Question mark  ?"
+        case .exclamationMark: "Exclamation  !"
+        case .colon: "Colon  :"
+        case .semicolon: "Semicolon  ;"
+        }
+    }
+
+    /// Spoken phrases that trigger it (English + German).
+    fileprivate var triggers: [String] {
+        switch self {
+        case .newParagraph: ["new paragraph", "neuer absatz"]
+        case .newLine: ["new line", "neue zeile"]
+        case .period: ["period", "punkt"]
+        case .comma: ["comma", "komma"]
+        case .questionMark: ["question mark", "fragezeichen"]
+        case .exclamationMark: ["exclamation mark", "ausrufezeichen"]
+        case .colon: ["colon", "doppelpunkt"]
+        case .semicolon: ["semicolon", "semikolon"]
+        }
+    }
+
+    fileprivate var replacement: String {
+        switch self {
+        case .newParagraph: "\n\n"
+        case .newLine: "\n"
+        case .period: "."
+        case .comma: ","
+        case .questionMark: "?"
+        case .exclamationMark: "!"
+        case .colon: ":"
+        case .semicolon: ";"
+        }
+    }
+
+    /// Punctuation attaches to the previous word (strip the leading space);
+    /// line/paragraph breaks stand on their own.
+    fileprivate var appendToPrevWord: Bool {
+        switch self {
+        case .newLine, .newParagraph: false
+        default: true
+        }
+    }
+}
+
 @MainActor
 final class VoiceCommandService {
     static let shared = VoiceCommandService()
 
-    // Punctuation / formatting commands. `appendToPrevWord` strips the space
-    // before the trigger so "hello comma" → "hello,".
     private struct Command {
-        let regex: NSRegularExpression
+        let id: VoiceCommandID
+        let regexes: [NSRegularExpression]
         let replacement: String
     }
 
@@ -21,25 +76,15 @@ final class VoiceCommandService {
     private let emojiAfterRegex: NSRegularExpression?
 
     private init() {
-        // Precompiled once (this runs on every confirmed streaming update, so we
-        // must not recompile per call).
-        func cmd(_ triggers: [String], _ replacement: String, appendToPrev: Bool) -> [Command] {
-            triggers.compactMap { trigger in
+        // Precompiled once (this runs on every confirmed streaming update).
+        commands = VoiceCommandID.allCases.map { id in
+            let regexes = id.triggers.compactMap { trigger -> NSRegularExpression? in
                 let escaped = NSRegularExpression.escapedPattern(for: trigger)
-                let pattern = appendToPrev ? "\\s*\\b\(escaped)\\b" : "\\b\(escaped)\\b"
-                guard let re = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else { return nil }
-                return Command(regex: re, replacement: replacement)
+                let pattern = id.appendToPrevWord ? "\\s*\\b\(escaped)\\b" : "\\b\(escaped)\\b"
+                return try? NSRegularExpression(pattern: pattern, options: .caseInsensitive)
             }
+            return Command(id: id, regexes: regexes, replacement: id.replacement)
         }
-        commands =
-            cmd(["new line", "neue zeile"], "\n", appendToPrev: false)
-            + cmd(["new paragraph", "neuer absatz"], "\n\n", appendToPrev: false)
-            + cmd(["period", "punkt"], ".", appendToPrev: true)
-            + cmd(["comma", "komma"], ",", appendToPrev: true)
-            + cmd(["question mark", "fragezeichen"], "?", appendToPrev: true)
-            + cmd(["exclamation mark", "ausrufezeichen"], "!", appendToPrev: true)
-            + cmd(["colon", "doppelpunkt"], ":", appendToPrev: true)
-            + cmd(["semicolon", "semikolon"], ";", appendToPrev: true)
 
         // Capture up to two words next to the "emoji"/"emojis" trigger so phrases
         // like "thumbs up emoji" resolve, while "big smile emoji" keeps "big".
@@ -54,11 +99,14 @@ final class VoiceCommandService {
     func process(_ text: String) -> String {
         var result = text
         if SettingsStore.shared.enableVoiceCommands {
-            for command in commands {
-                let range = NSRange(result.startIndex..., in: result)
-                result = command.regex.stringByReplacingMatches(
-                    in: result, range: range,
-                    withTemplate: NSRegularExpression.escapedTemplate(for: command.replacement))
+            let enabled = SettingsStore.shared.enabledVoiceCommandIDs
+            for command in commands where enabled.contains(command.id.rawValue) {
+                for regex in command.regexes {
+                    let range = NSRange(result.startIndex..., in: result)
+                    result = regex.stringByReplacingMatches(
+                        in: result, range: range,
+                        withTemplate: NSRegularExpression.escapedTemplate(for: command.replacement))
+                }
             }
         }
         if SettingsStore.shared.enableEmojiCommands {

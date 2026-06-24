@@ -9,7 +9,9 @@ struct StenoteApp: App {
         MenuBarExtra {
             MenuBarView()
         } label: {
-            Image(nsImage: recordingManager.isRecording ? Self.micRecordingIcon : Self.micIdleIcon)
+            Image(nsImage: recordingManager.isStarting
+                ? Self.micStartingIcon
+                : (recordingManager.isRecording ? Self.micRecordingIcon : Self.micIdleIcon))
         }
         .menuBarExtraStyle(.window)
     }
@@ -41,6 +43,22 @@ struct StenoteApp: App {
             let isDark = NSAppearance.currentDrawing().bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             let standColor = isDark ? "white" : "black"
             if let svgImage = makeSVGImage(topColor: "#E04848", bottomColor: standColor) {
+                svgImage.draw(in: rect)
+            }
+            return true
+        }
+        image.isTemplate = false
+        return image
+    }()
+
+    /// Shown for the brief moment between pressing the shortcut and the audio
+    /// engine being live — amber "got it, starting".
+    static let micStartingIcon: NSImage = {
+        let size = NSSize(width: 18, height: 18)
+        let image = NSImage(size: size, flipped: false) { rect in
+            let isDark = NSAppearance.currentDrawing().bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            let standColor = isDark ? "white" : "black"
+            if let svgImage = makeSVGImage(topColor: "#E0A21E", bottomColor: standColor) {
                 svgImage.draw(in: rect)
             }
             return true

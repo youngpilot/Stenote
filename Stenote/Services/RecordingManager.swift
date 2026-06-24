@@ -20,6 +20,7 @@ final class RecordingManager {
     private let pendingAudioTasks = PendingTaskCounter()
 
     private(set) var isRecording = false
+    private(set) var isStarting = false   // shortcut registered, engine spinning up (yellow)
     private(set) var isModelLoading = false
     private(set) var modelLoadError: String?
     private(set) var audioLevel: Float = 0.0
@@ -27,6 +28,7 @@ final class RecordingManager {
     private(set) var needsAccessibility = false
     private(set) var needsMicrophone = false
     private var recordingStartTime: Date?
+    private var startTask: Task<Void, Never>?
     private var sampleRingBuffer = RingBuffer<Float>(capacity: 16000 * 3, defaultValue: 0)
 
     var currentText: String { transcriptionService.currentText }
@@ -48,13 +50,6 @@ final class RecordingManager {
     private init() {
         hotkeyService.onToggle = { [weak self] in
             self?.toggle()
-        }
-
-        // Wire segment callback → incremental text insertion
-        // Called directly (no Task wrapper) to ensure text is inserted
-        // before stopRecording() calls endSession()
-        transcriptionService.onSegmentReady = { [weak self] text in
-            self?.outputService.insertText(text + " ")
         }
 
         // Wire silence timeout → auto-stop
@@ -87,6 +82,12 @@ final class RecordingManager {
         }
         isModelLoading = false
 
+        // Warm up the audio engine so the first recording starts fast — only if
+        // the mic is already granted, so we never touch it prematurely.
+        if AVCaptureDevice.authorizationStatus(for: .audio) == .authorized {
+            audioCaptureService.prepareEngine()
+        }
+
         // Daily update check (no-op in Manual mode; connectivity-driven, at most
         // one GET per 24h). Touching the singleton also starts its net monitor.
         UpdateService.shared.maybeAutoCheck()
@@ -101,7 +102,7 @@ final class RecordingManager {
     }
 
     func startRecording() {
-        guard !isRecording, transcriptionService.isModelLoaded else { return }
+        guard !isRecording, !isStarting, transcriptionService.isModelLoaded else { return }
 
         let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
         if micStatus == .denied || micStatus == .restricted {
@@ -109,16 +110,23 @@ final class RecordingManager {
             return
         }
 
-        outputService.rememberSourceApp()
+        // Instant acknowledgement the moment the shortcut registers — yellow icon
+        // + start sound — BEFORE the audio engine spins up (~200ms HAL setup).
+        isStarting = true
+        needsMicrophone = false
+        SoundFeedback.playStart()
 
-        Task { @MainActor in
-            await transcriptionService.startTranscription()
-            self.beginCapture()
-        }
+        outputService.rememberSourceApp()
+        transcriptionService.beginCapturing()   // hold audio until ASR is ready
+        startTask = Task { @MainActor in await transcriptionService.startTranscription() }
+
+        // Defer the engine start so the "starting" state paints first; audio
+        // captured once it's up is buffered (no lost words).
+        DispatchQueue.main.async { [weak self] in self?.beginCapture() }
     }
 
     private func beginCapture() {
-        guard !isRecording else { return }
+        guard isStarting, !isRecording else { return }
 
         let counter = pendingAudioTasks
         do {
@@ -145,11 +153,10 @@ final class RecordingManager {
                     }
                 }
             )
+            isStarting = false
             isRecording = true
             recordingStartTime = Date()
             needsAccessibility = !AXIsProcessTrusted()
-            needsMicrophone = false
-            SoundFeedback.playStart()
 
             if SettingsStore.shared.silenceMediaWhileRecording {
                 systemAudio.muteOutput()
@@ -157,13 +164,9 @@ final class RecordingManager {
             if SettingsStore.shared.pauseMediaApps {
                 systemAudio.pauseMediaApps()
             }
-
-            // Paste prefix text if configured
-            let prefix = SettingsStore.shared.prefixText
-            if !prefix.isEmpty {
-                outputService.insertText(prefix + " ")
-            }
+            // Prefix/suffix are pasted together with the full text when recording stops.
         } catch {
+            isStarting = false
             if case AudioCaptureError.microphoneDenied = error {
                 let status = AVCaptureDevice.authorizationStatus(for: .audio)
                 needsMicrophone = (status == .denied || status == .restricted)
@@ -185,6 +188,11 @@ final class RecordingManager {
         systemAudio.resumeMediaApps()
         SoundFeedback.playStop()
 
+        // Ensure the ASR finished starting (and any buffered audio was flushed)
+        // before we finish — so even a very short recording keeps its text.
+        await startTask?.value
+        startTask = nil
+
         // Drain in-flight audio Tasks before stopping transcription.
         // stopCapture() prevents new callbacks, but queued MainActor Tasks
         // may still need to call streamAudio(). Each sleep yields MainActor.
@@ -192,20 +200,18 @@ final class RecordingManager {
 
         let finalText = await transcriptionService.stopTranscription()
 
-        // Append suffix text if configured
-        let suffix = SettingsStore.shared.suffixText
-        if !suffix.isEmpty, !finalText.isEmpty {
-            outputService.insertText(" " + suffix)
-        }
-
-        // Save to history
-        if !finalText.isEmpty {
+        // Paste the COMPLETE transcript (with prefix/suffix) once — reliable,
+        // with no chunk-boundary artifacts from incremental pasting.
+        var output = finalText
+        if !output.isEmpty {
             let prefix = SettingsStore.shared.prefixText
-            var historyText = finalText
-            if !prefix.isEmpty { historyText = prefix + " " + historyText }
-            if !suffix.isEmpty { historyText += " " + suffix }
+            let suffix = SettingsStore.shared.suffixText
+            if !prefix.isEmpty { output = prefix + " " + output }
+            if !suffix.isEmpty { output = output + " " + suffix }
+
+            outputService.insertText(output)
             let duration = recordingStartTime.map { Date().timeIntervalSince($0) }
-            historyService.addEntry(historyText, duration: duration)
+            historyService.addEntry(output, duration: duration)
         }
 
         // Wait for all pending pastes to complete before ending session.
@@ -222,10 +228,10 @@ final class RecordingManager {
 
         // If Accessibility is off we couldn't type anywhere — leave the transcript
         // on the clipboard so the user can paste it, and keep it there (don't restore).
-        if !finalText.isEmpty, !AXIsProcessTrusted() {
+        if !output.isEmpty, !AXIsProcessTrusted() {
             outputService.suppressClipboardRestore = true
             NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(finalText, forType: .string)
+            NSPasteboard.general.setString(output, forType: .string)
         }
 
         outputService.endSession()

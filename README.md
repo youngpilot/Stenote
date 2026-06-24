@@ -36,8 +36,8 @@ In short: Apple Dictation is private but weak, Wispr Flow is polished but cloud 
 - **Word corrections** — custom replacements for names and jargon, with optional model boosting.
 - **History** — click any entry to copy; length configurable, from none to unlimited.
 - **Smart clipboard** — uses a concealed type so clipboard managers ignore pastes, and restores your clipboard afterward.
-- **Voice commands** — say "period", "comma", "new line" for punctuation, or turn on emoji-by-voice ("smile emoji" → 😊). Opt-in, curated, on-device.
-- **Also** — auto-stop on silence, paragraph breaks, prefix/suffix text, launch at login, menubar-only (no dock icon).
+- **Voice commands** — say "new line", "new paragraph", "period", "comma", etc.; each command is individually toggleable. Plus optional emoji-by-voice ("smile emoji" → 😊). Opt-in, on-device.
+- **Also** — auto-stop on silence, prefix/suffix text, launch at login, menubar-only (no dock icon).
 - **Updates** — *Manual* (no network calls, the default) or *Daily* (one lightweight GitHub check). No account, no telemetry.
 - **Guided setup** — a first-run welcome covers permissions, your shortcut, and preferences in a few steps.
 

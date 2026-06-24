@@ -26,6 +26,10 @@ final class SystemAudioService {
         ("Apple Music", "Music", "com.apple.Music"),
     ]
 
+    /// AppleScript runs here, never on the main thread — so recording reacts
+    /// instantly even when macOS shows the one-time Automation prompt.
+    private static let scriptQueue = DispatchQueue(label: "com.youngpilot.Stenote.applescript", qos: .userInitiated)
+
     private init() {
         DispatchQueue.main.async { [self] in
             self.supportsVolumeControl = self.checkVolumeSupport()
@@ -104,17 +108,24 @@ final class SystemAudioService {
     }
 
     /// Pause the first running, currently-playing supported player
-    /// (Spotify / Apple Music). Undo with resumeMediaApps().
+    /// (Spotify / Apple Music). The AppleScript runs OFF the main thread, so the
+    /// recording starts instantly even on the first run (when macOS shows the
+    /// one-time Automation prompt). Undo with resumeMediaApps().
     func pauseMediaApps() {
         pausedApp = nil
-        for (name, scriptName, bundleId) in Self.supportedMediaApps {
-            guard NSWorkspace.shared.runningApplications.contains(where: { $0.bundleIdentifier == bundleId }) else { continue }
-            guard isPlaying(scriptName: scriptName) else { continue }
-            if runAppleScript("tell application \"\(scriptName)\" to pause", context: "pause \(name)") {
-                pausedApp = scriptName
-                logger.info("Paused \(name)")
+        let candidates = Self.supportedMediaApps.filter { entry in
+            NSWorkspace.shared.runningApplications.contains { $0.bundleIdentifier == entry.bundleId }
+        }
+        guard !candidates.isEmpty else { return }
+        Self.scriptQueue.async { [weak self] in
+            for entry in candidates {
+                guard Self.scriptIsPlaying(entry.scriptName) else { continue }
+                if Self.runScript("tell application \"\(entry.scriptName)\" to pause", context: "pause \(entry.name)") {
+                    Task { @MainActor in self?.pausedApp = entry.scriptName }
+                    logger.info("Paused \(entry.name, privacy: .public)")
+                    break
+                }
             }
-            break
         }
     }
 
@@ -123,33 +134,42 @@ final class SystemAudioService {
         guard let app = pausedApp else { return }
         pausedApp = nil
         // Brief delay so resume lands after any unmute/fade settles.
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(150))
-            self.runAppleScript("tell application \"\(app)\" to play", context: "resume \(app)")
-            logger.info("Resumed \(app)")
+        Self.scriptQueue.asyncAfter(deadline: .now() + 0.15) {
+            _ = Self.runScript("tell application \"\(app)\" to play", context: "resume \(app)")
+            logger.info("Resumed \(app, privacy: .public)")
         }
     }
 
-    // MARK: - AppleScript helpers
+    /// Front-load the one-time Automation prompt for any running player (e.g. in
+    /// the onboarding wizard) by sending a harmless query — so the first real
+    /// recording is never interrupted by it. Runs off the main thread.
+    func requestMediaAutomationPermission() {
+        let running = Self.supportedMediaApps.filter { entry in
+            NSWorkspace.shared.runningApplications.contains { $0.bundleIdentifier == entry.bundleId }
+        }
+        guard !running.isEmpty else { return }
+        Self.scriptQueue.async {
+            for entry in running { _ = Self.scriptIsPlaying(entry.scriptName) }
+        }
+    }
 
-    private func isPlaying(scriptName: String) -> Bool {
+    // MARK: - AppleScript helpers (always run on scriptQueue, never main)
+
+    private nonisolated static func scriptIsPlaying(_ scriptName: String) -> Bool {
         guard let script = NSAppleScript(source: "tell application \"\(scriptName)\" to player state as string") else { return false }
         var error: NSDictionary?
         let descriptor = script.executeAndReturnError(&error)
-        if let error {
-            logger.warning("AppleScript player-state \(scriptName) failed: \(String(describing: error))")
-            return false
-        }
+        if error != nil { return false }
         return descriptor.stringValue?.lowercased() == "playing"
     }
 
     @discardableResult
-    private func runAppleScript(_ source: String, context: String) -> Bool {
+    private nonisolated static func runScript(_ source: String, context: String) -> Bool {
         guard let script = NSAppleScript(source: source) else { return false }
         var error: NSDictionary?
         script.executeAndReturnError(&error)
         if let error {
-            logger.warning("AppleScript (\(context)) failed: \(String(describing: error))")
+            logger.warning("AppleScript (\(context, privacy: .public)) failed: \(String(describing: error), privacy: .public)")
             return false
         }
         return true

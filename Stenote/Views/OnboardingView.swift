@@ -49,6 +49,7 @@ struct OnboardingView: View {
     @State private var recordingManager = RecordingManager.shared
     @State private var micGranted = false
     @State private var axGranted = false
+    @State private var requestedMediaAuth = false
 
     private let lastStep = 4
 
@@ -215,6 +216,15 @@ struct OnboardingView: View {
                 .font(.caption).foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer()
+        }
+        .onAppear {
+            // Front-load the Spotify/Apple Music Automation prompt during setup,
+            // so the first recording reacts instantly. Only does anything if
+            // pausing is on and a player is actually running.
+            if !requestedMediaAuth, settings.pauseMediaApps {
+                requestedMediaAuth = true
+                SystemAudioService.shared.requestMediaAutomationPermission()
+            }
         }
     }
 

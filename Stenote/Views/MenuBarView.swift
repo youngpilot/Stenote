@@ -418,7 +418,7 @@ struct MenuBarView: View {
     private var historySection: some View {
         TimelineView(.periodic(from: .now, by: 60)) { _ in
             let allEntries = recordingManager.historyService.entries
-            let pageSize = 5
+            let pageSize = settings.historyPageSize
             let totalPages = max(1, (allEntries.count + pageSize - 1) / pageSize)
             let safePage = min(historyPage, totalPages - 1)
             let pageEntries = Array(allEntries.dropFirst(safePage * pageSize).prefix(pageSize))
@@ -962,6 +962,19 @@ private struct InlineSettingsView: View {
                     .fixedSize()
                 }
 
+                settingsRow("Recordings per page") {
+                    Picker("", selection: Binding(
+                        get: { settings.historyPageSize },
+                        set: { settings.historyPageSize = $0 }
+                    )) {
+                        ForEach([1, 3, 5, 7, 10], id: \.self) { n in
+                            Text("\(n)").tag(n)
+                        }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                }
+
                 settingsRow("History length") {
                     Picker("", selection: Binding(
                         get: { settings.historyLength },
@@ -1163,10 +1176,26 @@ private struct InlineSettingsView: View {
                 .font(labelFont)
 
                 if settings.enableVoiceCommands {
-                    Text("Say \"period\", \"comma\", \"new line\" etc. to insert punctuation.")
+                    Text("Say the phrase to insert it (e.g. \"new paragraph\", \"period\"). Toggle the ones you want:")
                         .font(labelFont)
                         .foregroundStyle(.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        ForEach(VoiceCommandID.allCases) { cmd in
+                            Toggle(cmd.label, isOn: Binding(
+                                get: { settings.enabledVoiceCommandIDs.contains(cmd.id) },
+                                set: { on in
+                                    var ids = settings.enabledVoiceCommandIDs
+                                    if on { ids.insert(cmd.id) } else { ids.remove(cmd.id) }
+                                    settings.enabledVoiceCommandIDs = ids
+                                }
+                            ))
+                            .toggleStyle(.checkbox)
+                            .font(labelFont)
+                        }
+                    }
+                    .padding(.leading, 8)
                 }
 
                 Toggle("Emoji by Voice", isOn: Binding(
