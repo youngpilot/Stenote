@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-VERSION="0.8.4"
+VERSION="0.8.5"
 APP_NAME="Stenote"
 TEAM_ID="${STENOTE_TEAM_ID:?Set STENOTE_TEAM_ID env var (Apple Developer Team ID)}"
 BUNDLE_ID="com.youngpilot.Stenote"

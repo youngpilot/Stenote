@@ -2,6 +2,11 @@
 
 All notable changes to Stenote. Dates are release dates; versions follow the app's `MARKETING_VERSION`.
 
+## 0.8.5
+
+### Fixed
+- **Dropped characters in the output** (e.g. "Deutsch" → "Dutsch", "sauber" → "saubr"). After the switch to whole-text paste, a full sentence was typed key-by-key with no gap, overrunning the target app's event queue so it silently dropped letters. Sentences now insert atomically via the clipboard; the direct-typing path (short snippets / Direct Typing mode) is paced and runs off the main thread so it stays reliable without freezing the UI.
+
 ## 0.8.4
 
 ### Added

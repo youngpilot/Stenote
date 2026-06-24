@@ -147,7 +147,11 @@ final class OutputService {
         case .direct:
             useDirectTyping = true
         case .auto:
-            useDirectTyping = textToSend.count <= 80
+            // Only genuinely short snippets type directly; anything longer goes
+            // through the atomic, drop-proof clipboard paste below. (Whole-text
+            // paste-at-stop means "short" must be small — an 80-char sentence
+            // typed key-by-key dropped characters.)
+            useDirectTyping = textToSend.count <= 30
         case .clipboard:
             useDirectTyping = false
         }
@@ -155,17 +159,23 @@ final class OutputService {
         if useDirectTyping {
             logger.info("Direct typing: \(textToSend.count) chars")
 
-            // Only activate if not already frontmost
+            // Typing runs on the background typingQueue (it sleeps between
+            // characters); only activate the app first if it isn't frontmost,
+            // then drain back on the main actor once typing completes.
             let isFrontmost = NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier
             if !isFrontmost {
                 app.activate()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) { [weak self] in
-                    self?.typeTextDirectly(textToSend)
-                    self?.scheduleDrain(to: app)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) {
+                    OutputService.typingQueue.async { [weak self] in
+                        self?.typeTextDirectly(textToSend)
+                        DispatchQueue.main.async { self?.scheduleDrain(to: app) }
+                    }
                 }
             } else {
-                typeTextDirectly(textToSend)
-                scheduleDrain(to: app)
+                OutputService.typingQueue.async { [weak self] in
+                    self?.typeTextDirectly(textToSend)
+                    DispatchQueue.main.async { self?.scheduleDrain(to: app) }
+                }
             }
             return
         }
@@ -236,7 +246,17 @@ final class OutputService {
         doPaste(to: sourceApp)
     }
 
-    private func typeTextDirectly(_ text: String) {
+    /// Serial queue for synthetic keystrokes, so the small inter-character gap
+    /// below never blocks the main thread.
+    private static let typingQueue = DispatchQueue(label: "com.youngpilot.Stenote.typing", qos: .userInitiated)
+
+    /// Types `text` as Unicode keystrokes. Runs OFF the main thread on
+    /// `typingQueue` with a short gap between characters: posting a whole
+    /// sentence back-to-back overruns the target app's event queue and it
+    /// silently drops characters ("Deutsch" → "Dutsch"). The gap lets each
+    /// keystroke land. Longer whole-text inserts go through the clipboard
+    /// instead (see `doPaste`), so this only handles short text + Direct mode.
+    private nonisolated func typeTextDirectly(_ text: String) {
         guard AXIsProcessTrusted() else {
             promptAccessibility()
             return
@@ -254,6 +274,7 @@ final class OutputService {
             keyUp?.keyboardSetUnicodeString(stringLength: utf16.count, unicodeString: &utf16)
             keyDown?.post(tap: .cgAnnotatedSessionEventTap)
             keyUp?.post(tap: .cgAnnotatedSessionEventTap)
+            Thread.sleep(forTimeInterval: 0.005)
         }
     }
 
