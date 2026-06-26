@@ -448,7 +448,7 @@
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Stenote needs Automation access to detect if music is playing, so it can pause during recording and resume when you stop.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Stenote uses your microphone to transcribe speech into text locally on your device. Audio never leaves your Mac.";
-				MARKETING_VERSION = 0.10.0;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.youngpilot.Stenote;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -470,7 +470,7 @@
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Stenote needs Automation access to detect if music is playing, so it can pause during recording and resume when you stop.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Stenote uses your microphone to transcribe speech into text locally on your device. Audio never leaves your Mac.";
-				MARKETING_VERSION = 0.10.0;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.youngpilot.Stenote;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -487,7 +487,7 @@
 				DEVELOPMENT_TEAM = 5A4T37N77V;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.2;
-				MARKETING_VERSION = 0.10.0;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.youngpilot.StenoteTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -505,7 +505,7 @@
 				DEVELOPMENT_TEAM = 5A4T37N77V;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.2;
-				MARKETING_VERSION = 0.10.0;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.youngpilot.StenoteTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;

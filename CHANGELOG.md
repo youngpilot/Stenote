@@ -2,26 +2,22 @@
 
 All notable changes to Stenote. Dates are release dates; versions follow the app's `MARKETING_VERSION`.
 
-## 0.10.0
+## 1.0.0
+
+The 1.0 release — still 100% on-device and private, now with file transcription, encrypted history, a clearer level meter, and dictation stats.
 
 ### Added
-- **Words-per-minute** — your dictation pace is tracked per recording and shown as an average (`~140 wpm avg`) in the footer stats. File imports and very short clips are excluded so the number stays honest.
-- **Clearer level meter** — the recording waveform is now a boxed strip of bars that reads as an input-level meter: bars rise with your voice and turn orange when you're too loud. (File transcriptions and short clips are excluded from the WPM average.)
+- **Transcribe audio files** — drag a file onto the popover, pick one with the waveform button in the menubar header, or transcribe an audio file from the clipboard. Files run through the batch speech engine; the text is copied and saved to History.
+- **Words-per-minute** — your dictation pace is tracked per recording and shown as an average (`~140 wpm avg`) in the footer stats. File imports and very short or implausibly slow/fast clips are excluded so the number stays honest.
+- **Clearer level meter** — the recording waveform is now a boxed strip of bars that reads as an input-level meter: bars rise with your voice and turn orange when you're too loud.
 - **Menubar feedback** — the mic icon gently pulses while recording, and a short status line confirms file transcriptions ("Saved to history · copied") or surfaces errors.
 
 ### Changed
+- **Transcription history is now encrypted at rest** (AES-GCM, key held in the macOS Keychain). Existing plaintext history is migrated automatically on first launch. Recorded audio is still never written to disk.
 - Reworked the audio level pipeline to feed the meter directly, dropping the old raw-sample buffer — less memory and less work while recording.
 
-## 0.9.0
-
-### Added
-- **Transcribe audio files.** Drag an audio file onto the popover, pick one with the new waveform button in the menubar header, or transcribe an audio file from the clipboard. Files run through the batch speech engine; the result is copied and saved to History.
-
-### Changed
-- **Transcription history is now encrypted at rest** (AES-GCM, key held in the macOS Keychain). Existing plaintext history is migrated automatically on first launch. Recorded audio is still never written to disk.
-
 ### Internal
-- Added a unit-test target covering the streaming-window invariant (the guard behind the 0.8.6 fix), trailing-stutter removal, and the AES-GCM encryption primitive.
+- Added a unit-test target (27 tests) covering the streaming-window invariant (the guard behind the 0.8.6 fix), trailing-stutter removal, the AES-GCM primitive, and WPM eligibility.
 
 ## 0.8.7
 
