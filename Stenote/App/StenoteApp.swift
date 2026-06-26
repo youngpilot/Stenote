@@ -48,8 +48,28 @@ struct StenoteApp: App {
         return image
     }
 
-    /// Recording — red.
-    static let micRecordingIcon: NSImage = coloredMicIcon(top: "#E04848")
+    /// Recording icon whose capsule deepens with the mic level — a light red at
+    /// silence, a heavy red when loud. Quantized into buckets and cached, so the
+    /// SVG is rendered at most once per bucket (not on every level update). The
+    /// stand still adapts to light/dark at draw time (via `coloredMicIcon`).
+    @MainActor private static var recordingIconCache: [Int: NSImage] = [:]
+
+    @MainActor static func recordingIcon(level: Float) -> NSImage {
+        let steps = 16
+        let clamped = min(max(level, 0), 1)
+        let bucket = Int((clamped * Float(steps - 1)).rounded())
+        if let cached = recordingIconCache[bucket] { return cached }
+        let t = Double(bucket) / Double(steps - 1)
+        // light red (#F6A6A6, silence) → heavy red (#D81A1A, loud)
+        let r = 0.965 + (0.847 - 0.965) * t
+        let g = 0.651 + (0.102 - 0.651) * t
+        let b = 0.651 + (0.102 - 0.651) * t
+        let hex = String(format: "#%02X%02X%02X",
+                         Int((r * 255).rounded()), Int((g * 255).rounded()), Int((b * 255).rounded()))
+        let icon = coloredMicIcon(top: hex)
+        recordingIconCache[bucket] = icon
+        return icon
+    }
 
     /// Shown for the brief moment between pressing the shortcut and the audio
     /// engine being live — amber "got it, starting".
@@ -62,28 +82,29 @@ struct StenoteApp: App {
     static let micDoneIcon: NSImage = coloredMicIcon(top: "#34C759")
 }
 
-/// The menubar status item. Its color reflects state: red while recording, amber
-/// starting, blue while transcribing a file, green when a file transcription is
-/// ready to be seen, otherwise the default mic. Active states (recording,
-/// transcribing) gently breathe so the work reads at a glance. It's a status
-/// item, not a Liquid-Glass tap target.
+/// The menubar status item. Its color reflects state: red while recording (the
+/// red deepens with your voice — light at silence, heavy when loud), amber
+/// starting, blue while transcribing a file, green when a transcription is ready,
+/// otherwise the default mic. The blue transcribing state gently breathes (no mic
+/// signal to drive it). It's a status item, not a Liquid-Glass tap target.
 private struct MenuBarLabel: View {
     @State private var recordingManager = RecordingManager.shared
     @State private var dimmed = false
 
-    /// Active states that pulse the icon (recording = red, transcribing = blue).
-    private var isPulsing: Bool {
-        recordingManager.isRecording || recordingManager.isTranscribingFile
+    /// Only the file-transcription (blue) state uses the timed breathe — recording
+    /// pulses via the level-driven red instead.
+    private var isBreathing: Bool {
+        recordingManager.isTranscribingFile && !recordingManager.isRecording
     }
 
     var body: some View {
         Image(nsImage: icon)
-            .opacity(isPulsing && dimmed ? 0.55 : 1.0)
+            .opacity(isBreathing && dimmed ? 0.55 : 1.0)
             .animation(.easeInOut(duration: 0.6), value: dimmed)
-            .task(id: isPulsing) {
+            .task(id: isBreathing) {
                 dimmed = false
-                guard isPulsing else { return }
-                while !Task.isCancelled && isPulsing {
+                guard isBreathing else { return }
+                while !Task.isCancelled && isBreathing {
                     dimmed.toggle()
                     try? await Task.sleep(for: .milliseconds(600))
                 }
@@ -93,7 +114,7 @@ private struct MenuBarLabel: View {
 
     private var icon: NSImage {
         if recordingManager.isStarting { return StenoteApp.micStartingIcon }
-        if recordingManager.isRecording { return StenoteApp.micRecordingIcon }
+        if recordingManager.isRecording { return StenoteApp.recordingIcon(level: recordingManager.inputLevel) }
         if recordingManager.isTranscribingFile { return StenoteApp.micTranscribingIcon }
         if recordingManager.fileTranscriptionDone { return StenoteApp.micDoneIcon }
         return StenoteApp.micIdleIcon
