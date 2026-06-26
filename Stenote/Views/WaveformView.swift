@@ -1,102 +1,47 @@
 import SwiftUI
 
+/// A boxed input-level meter: a scrolling strip of a few-pixel-wide bars, each
+/// one honest mic-level time-slice. Reads the smoothed `inputLevel` directly
+/// (so updates don't invalidate the whole popover) and keeps its own bar ring.
 struct WaveformView: View {
-    let samples: [Float]
-    let isRecording: Bool
+    @State private var recordingManager = RecordingManager.shared
+    @State private var bars: [Float] = []
+
+    private let barWidth: CGFloat = 3
+    private let gap: CGFloat = 2
+    private let inset: CGFloat = 4          // keep bars clear of the rounded box
+    private let maxHalf: CGFloat = 13       // half-height within the 32pt box
+    private let capacity = 256              // bar-ring cap (well over what fits)
 
     var body: some View {
         Canvas { context, size in
+            let pitch = barWidth + gap
+            let count = max(1, Int((size.width - inset * 2) / pitch))
             let midY = size.height / 2
-            let binCount = max(1, Int(size.width))
+            let visible = Array(bars.suffix(count))
+            let leftPad = count - visible.count   // fill from the right while warming up
 
-            guard !samples.isEmpty, isRecording else {
-                var linePath = Path()
-                linePath.move(to: CGPoint(x: 0, y: midY))
-                linePath.addLine(to: CGPoint(x: size.width, y: midY))
-                context.stroke(linePath, with: .color(.gray.opacity(0.3)), lineWidth: 1)
-                return
+            for (offset, level) in visible.enumerated() {
+                let i = leftPad + offset
+                let x = inset + CGFloat(i) * pitch
+                let half = max(1, CGFloat(level) * maxHalf)   // ~1pt nub at silence
+                let rect = CGRect(x: x, y: midY - half, width: barWidth, height: half * 2)
+                let bar = Path(roundedRect: rect, cornerRadius: barWidth / 2)
+                // Bars near the top (hot) flip to orange as a clipping cue.
+                context.fill(bar, with: .color(level > 0.9 ? .orange : .green))
             }
-
-            let rmsValues = downsample(binCount: binCount)
-            let smoothed = smooth(rmsValues, windowSize: 3)
-
-            var topPath = Path()
-            var bottomPath = Path()
-            topPath.move(to: CGPoint(x: 0, y: midY))
-            bottomPath.move(to: CGPoint(x: 0, y: midY))
-
-            for (i, rms) in smoothed.enumerated() {
-                let x = CGFloat(i)
-                let amplitude = CGFloat(min(rms * 7.0, 1.0)) * midY
-                topPath.addLine(to: CGPoint(x: x, y: midY - amplitude))
-                bottomPath.addLine(to: CGPoint(x: x, y: midY + amplitude))
-            }
-
-            topPath.addLine(to: CGPoint(x: size.width, y: midY))
-            bottomPath.addLine(to: CGPoint(x: size.width, y: midY))
-
-            let fillColor = Color.green
-            let topGradient = Gradient(stops: [
-                .init(color: fillColor.opacity(0.2), location: 0),
-                .init(color: fillColor.opacity(0.7), location: 1),
-            ])
-            let bottomGradient = Gradient(stops: [
-                .init(color: fillColor.opacity(0.7), location: 0),
-                .init(color: fillColor.opacity(0.2), location: 1),
-            ])
-
-            context.fill(topPath, with: .linearGradient(
-                topGradient,
-                startPoint: CGPoint(x: size.width / 2, y: 0),
-                endPoint: CGPoint(x: size.width / 2, y: midY)
-            ))
-            context.fill(bottomPath, with: .linearGradient(
-                bottomGradient,
-                startPoint: CGPoint(x: size.width / 2, y: midY),
-                endPoint: CGPoint(x: size.width / 2, y: size.height)
-            ))
         }
         .frame(height: 32)
-        .clipShape(RoundedRectangle(cornerRadius: 6))
-        .animation(.easeOut(duration: 0.3), value: isRecording)
-    }
-
-    private func downsample(binCount: Int) -> [Float] {
-        let samplesPerBin = max(1, samples.count / binCount)
-        var bins: [Float] = []
-        bins.reserveCapacity(binCount)
-
-        for i in 0..<binCount {
-            let start = i * samples.count / binCount
-            let end = min(start + samplesPerBin, samples.count)
-            guard start < end else {
-                bins.append(0)
-                continue
-            }
-            var sumSquares: Float = 0
-            for j in start..<end {
-                sumSquares += samples[j] * samples[j]
-            }
-            bins.append(sqrtf(sumSquares / Float(end - start)))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .strokeBorder(Color.secondary.opacity(0.15), lineWidth: 0.5)
+        )
+        .onChange(of: recordingManager.inputLevel) { _, level in
+            bars.append(level)
+            if bars.count > capacity { bars.removeFirst(bars.count - capacity) }
         }
-        return bins
-    }
-
-    private func smooth(_ values: [Float], windowSize: Int) -> [Float] {
-        guard values.count > windowSize else { return values }
-        let half = windowSize / 2
-        var result: [Float] = []
-        result.reserveCapacity(values.count)
-
-        for i in 0..<values.count {
-            let lo = max(0, i - half)
-            let hi = min(values.count - 1, i + half)
-            var sum: Float = 0
-            for j in lo...hi {
-                sum += values[j]
-            }
-            result.append(sum / Float(hi - lo + 1))
+        .onChange(of: recordingManager.isRecording) { _, recording in
+            if !recording { bars.removeAll() }
         }
-        return result
     }
 }

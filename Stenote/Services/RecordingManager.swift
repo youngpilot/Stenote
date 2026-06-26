@@ -23,8 +23,7 @@ final class RecordingManager {
     private(set) var isStarting = false   // shortcut registered, engine spinning up (yellow)
     private(set) var isModelLoading = false
     private(set) var modelLoadError: String?
-    private(set) var audioLevel: Float = 0.0
-    private(set) var waveformSamples: [Float] = []
+    private(set) var inputLevel: Float = 0.0   // smoothed mic level [0,1] for the meter
     private(set) var needsAccessibility = false
     private(set) var needsMicrophone = false
     private(set) var isTranscribingFile = false
@@ -37,7 +36,6 @@ final class RecordingManager {
     /// ASR can't be torn down cleanly mid-flight, so we let it come up and then
     /// stop it cleanly (honored in beginCapture).
     private var stopAfterStart = false
-    private var sampleRingBuffer = RingBuffer<Float>(capacity: 16000 * 3, defaultValue: 0)
 
     var currentText: String { transcriptionService.currentText }
     var isModelLoaded: Bool { transcriptionService.isModelLoaded }
@@ -153,14 +151,11 @@ final class RecordingManager {
                 },
                 onLevel: { [weak self] level in
                     Task { @MainActor in
-                        self?.audioLevel = level
-                    }
-                },
-                onSamples: { [weak self] samples in
-                    Task { @MainActor in
                         guard let self else { return }
-                        self.sampleRingBuffer.append(contentsOf: samples)
-                        self.waveformSamples = self.sampleRingBuffer.toArray()
+                        // Asymmetric ballistics: fast attack, slow release — peaks
+                        // pop instantly, then decay gracefully (level-meter feel).
+                        let alpha: Float = level > self.inputLevel ? 0.6 : 0.2
+                        self.inputLevel += alpha * (level - self.inputLevel)
                     }
                 }
             )
@@ -199,9 +194,7 @@ final class RecordingManager {
         guard isRecording else { return }
         audioCaptureService.stopCapture()
         isRecording = false
-        audioLevel = 0.0
-        waveformSamples = []
-        sampleRingBuffer = RingBuffer<Float>(capacity: 16000 * 3, defaultValue: 0)
+        inputLevel = 0.0
         // Always restore — each is a no-op if it wasn't applied (also handles a
         // setting being toggled off mid-recording).
         systemAudio.restoreOutput()

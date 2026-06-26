@@ -301,8 +301,8 @@ struct MenuBarView: View {
 
         // Audio level + transcription preview while recording
         if recordingManager.isRecording {
-            // Waveform visualization
-            WaveformView(samples: recordingManager.waveformSamples, isRecording: recordingManager.isRecording)
+            // Input-level meter
+            WaveformView()
                 .accessibilityHidden(true)
 
             if !recordingManager.currentText.isEmpty {
@@ -876,33 +876,6 @@ private struct IconHoverButtonStyle: ButtonStyle {
             .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             .onHover { hovering = isEnabled && $0 }
             .animation(.easeOut(duration: 0.12), value: hovering)
-    }
-}
-
-// MARK: - Audio Level Indicator
-
-private struct AudioLevelView: View {
-    let level: Float
-    private let barCount = 20
-
-    var body: some View {
-        HStack(spacing: 2) {
-            ForEach(0..<barCount, id: \.self) { index in
-                let threshold = Float(index) / Float(barCount)
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(barColor(for: index))
-                    .frame(height: 6)
-                    .opacity(level > threshold ? 1.0 : 0.15)
-            }
-        }
-        .animation(.easeOut(duration: 0.08), value: level)
-    }
-
-    private func barColor(for index: Int) -> Color {
-        let ratio = Float(index) / Float(barCount)
-        if ratio > 0.8 { return .red }
-        if ratio > 0.6 { return .orange }
-        return .green
     }
 }
 

@@ -22,7 +22,6 @@ final class AudioCaptureService: @unchecked Sendable {
     // Per-recording sinks; the tap forwards to them only while `active`.
     private var onBuffer: (@Sendable (AVAudioPCMBuffer) -> Void)?
     private var onLevel: (@Sendable (Float) -> Void)?
-    private var onSamples: (@Sendable ([Float]) -> Void)?
 
     /// Allocate engine resources ahead of time (no mic I/O, no indicator) so the
     /// first real start is fast. Call once at launch, only when mic is granted.
@@ -36,8 +35,7 @@ final class AudioCaptureService: @unchecked Sendable {
     /// `microphoneDenied` so the caller can surface the warning card.
     func startCapture(
         onBuffer: @escaping @Sendable (AVAudioPCMBuffer) -> Void,
-        onLevel: @escaping @Sendable (Float) -> Void,
-        onSamples: @escaping @Sendable ([Float]) -> Void
+        onLevel: @escaping @Sendable (Float) -> Void
     ) throws {
         let status = AVCaptureDevice.authorizationStatus(for: .audio)
         logger.debug("Mic permission status: \(status.rawValue, privacy: .public)")
@@ -51,7 +49,6 @@ final class AudioCaptureService: @unchecked Sendable {
 
         self.onBuffer = onBuffer
         self.onLevel = onLevel
-        self.onSamples = onSamples
 
         refreshTapIfNeeded()
         // Clear any resampler filter state left over from a previous session so
@@ -109,16 +106,24 @@ final class AudioCaptureService: @unchecked Sendable {
         }
         guard error == nil else { return }
 
-        if let floatData = converted.floatChannelData {
+        if let floatData = converted.floatChannelData, let onLevel {
             let count = Int(converted.frameLength)
             if count > 0 {
-                var rms: Float = 0
-                vDSP_rmsqv(floatData[0], 1, &rms, vDSP_Length(count))
-                // dB-like scale tuned for laptop mic speech.
-                let db = 20 * log10(max(rms, 1e-6))
-                let level = min(max((db + 55) / 40, 0), 1.0) // -55dB floor, -15dB ceiling
-                onLevel?(level)
-                onSamples?(Array(UnsafeBufferPointer(start: floatData[0], count: count)))
+                // Emit several sub-window levels per buffer (~16/sec at 4096-frame
+                // taps) so the level meter scrolls smoothly instead of in ~4 steps.
+                let subWindows = 4
+                let windowLen = max(1, count / subWindows)
+                var offset = 0
+                while offset < count {
+                    let len = min(windowLen, count - offset)
+                    var rms: Float = 0
+                    vDSP_rmsqv(floatData[0] + offset, 1, &rms, vDSP_Length(len))
+                    // dB-like scale tuned for laptop mic speech.
+                    let db = 20 * log10(max(rms, 1e-6))
+                    let level = min(max((db + 55) / 40, 0), 1.0) // -55dB floor, -15dB ceiling
+                    onLevel(level)
+                    offset += len
+                }
             }
         }
         onBuffer?(converted)
