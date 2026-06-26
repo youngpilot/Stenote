@@ -21,6 +21,7 @@ final class TranscriptionService {
     // Shared FluidAudio components
     private var asrModels: UncheckedSendableBox<AsrModels>?
     private var streamingAsr: StreamingAsrManager?
+    private var batchAsr: AsrManager?        // batch engine for file transcription (lazy)
     private var vadManager: VadManager?
     private var ctcBox: UncheckedSendableBox<CtcModels>?
 
@@ -173,6 +174,32 @@ final class TranscriptionService {
         await stopStreaming()
         isTranscribing = false
         return currentText
+    }
+
+    // MARK: - File transcription (batch)
+
+    /// Transcribe an audio file (any length) with the BATCH ASR — full context,
+    /// internal chunking, no streaming windows (so the encoder-window limit can't
+    /// apply). Reuses the loaded models via a lazily-created AsrManager. Applies
+    /// word corrections, but NOT the dictation voice-commands (which don't fit
+    /// arbitrary recordings). Throws if models aren't loaded or the clip is < ~1s.
+    func transcribeFile(url: URL) async throws -> String {
+        guard let asrModels else {
+            throw NSError(domain: "Stenote", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: "Speech model isn't loaded yet."])
+        }
+        let asr: AsrManager
+        if let existing = batchAsr {
+            asr = existing
+        } else {
+            let manager = AsrManager()
+            try await manager.initialize(models: asrModels.value)
+            batchAsr = manager
+            asr = manager
+        }
+        let result = try await asr.transcribe(url, source: .system)
+        let trimmed = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return textReplacement.applyReplacements(to: trimmed)
     }
 
     // MARK: - Audio Input (single ordered consumer)

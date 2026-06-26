@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct MenuBarView: View {
     @State private var recordingManager = RecordingManager.shared
@@ -19,6 +20,7 @@ struct MenuBarView: View {
     @State private var historyPage = 0
     @State private var hoveringRecordings = false
     @State private var showClearConfirm = false
+    @State private var fileDropTargeted = false
 
     var body: some View {
         VStack(spacing: DesignTokens.Spacing.m) {
@@ -32,6 +34,46 @@ struct MenuBarView: View {
         .frame(width: 320)
         .contentShape(Rectangle())
         .focusEffectDisabled()
+        .dropDestination(for: URL.self) { urls, _ in
+            guard let url = urls.first(where: Self.isAudioFile) else { return false }
+            recordingManager.transcribeFile(url)
+            return true
+        } isTargeted: { fileDropTargeted = $0 }
+        .overlay {
+            if fileDropTargeted {
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 2, dash: [6]))
+                    .background(Color.accentColor.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+                    .overlay {
+                        Label("Drop audio to transcribe", systemImage: "waveform")
+                            .font(.body).fontWeight(.medium)
+                            .padding(.horizontal, 12).padding(.vertical, 8)
+                            .background(.regularMaterial, in: Capsule())
+                    }
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.12), value: fileDropTargeted)
+    }
+
+    /// Whether a dragged/picked URL is an audio file we can transcribe.
+    static func isAudioFile(_ url: URL) -> Bool {
+        (try? url.resourceValues(forKeys: [.contentTypeKey]))?.contentType?.conforms(to: .audio) ?? false
+    }
+
+    /// Open a file picker for an audio file and transcribe the chosen one.
+    private func pickAudioFile() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.audio]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.prompt = "Transcribe"
+        panel.message = "Choose an audio file to transcribe"
+        NSApp.activate(ignoringOtherApps: true)
+        if panel.runModal() == .OK, let url = panel.url {
+            recordingManager.transcribeFile(url)
+        }
     }
 
     // MARK: - Main View
@@ -100,6 +142,23 @@ struct MenuBarView: View {
             Spacer()
 
             Button {
+                pickAudioFile()
+            } label: {
+                if recordingManager.isTranscribingFile {
+                    ProgressView().controlSize(.small)
+                        .frame(width: 16, height: 16)
+                } else {
+                    Image(systemName: "waveform.badge.plus")
+                        .frame(width: 16, height: 16)
+                }
+            }
+            .buttonStyle(PopoverButtonStyle())
+            .disabled(!recordingManager.isModelLoaded || recordingManager.isRecording
+                      || recordingManager.isStarting || recordingManager.isTranscribingFile)
+            .help("Transcribe an audio file (or drop one here)")
+            .accessibilityLabel("Transcribe an audio file")
+
+            Button {
                 withAnimation(.easeInOut(duration: 0.15)) {
                     showSettings = true
                 }
@@ -153,6 +212,37 @@ struct MenuBarView: View {
                 .font(.body)
                 .buttonStyle(BorderedHoverButtonStyle())
                 .controlSize(.small)
+            }
+            .padding(DesignTokens.Spacing.s)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.red.opacity(0.3), lineWidth: 0.5))
+        }
+
+        // File transcription progress
+        if recordingManager.isTranscribingFile {
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text("Transcribing \(recordingManager.fileTranscriptionName ?? "file")…")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer()
+            }
+            .padding(DesignTokens.Spacing.s)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+        }
+
+        // File transcription error
+        if let fileError = recordingManager.fileTranscriptionError {
+            HStack(spacing: 6) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.red)
+                Text(fileError)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                Spacer()
             }
             .padding(DesignTokens.Spacing.s)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))

@@ -3,6 +3,7 @@ import AVFoundation
 import Foundation
 import Observation
 import os
+import UniformTypeIdentifiers
 
 private let logger = Logger(subsystem: "com.youngpilot.Stenote", category: "RecordingManager")
 
@@ -26,6 +27,9 @@ final class RecordingManager {
     private(set) var waveformSamples: [Float] = []
     private(set) var needsAccessibility = false
     private(set) var needsMicrophone = false
+    private(set) var isTranscribingFile = false
+    private(set) var fileTranscriptionName: String?
+    private(set) var fileTranscriptionError: String?
     private var recordingStartTime: Date?
     private var startTask: Task<Void, Never>?
     private var audioContinuation: AsyncStream<AVAudioPCMBuffer>.Continuation?
@@ -252,6 +256,54 @@ final class RecordingManager {
         }
 
         outputService.endSession()
+    }
+
+    // MARK: - File transcription
+
+    /// Transcribe an audio file (drag-drop / picker / clipboard) with the batch
+    /// engine. A file has no source app to type into, so the result is copied to
+    /// the clipboard and saved to History (no auto-typing). Disabled while a live
+    /// recording is in flight.
+    func transcribeFile(_ url: URL) {
+        guard !isRecording, !isStarting, !isTranscribingFile,
+              transcriptionService.isModelLoaded else { return }
+        fileTranscriptionError = nil
+        isTranscribingFile = true
+        fileTranscriptionName = url.lastPathComponent
+        Task { @MainActor in
+            defer { isTranscribingFile = false; fileTranscriptionName = nil }
+            do {
+                let text = try await transcriptionService.transcribeFile(url: url)
+                guard !text.isEmpty else {
+                    fileTranscriptionError = "No speech found in that file."
+                    return
+                }
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(text, forType: .string)
+                historyService.addEntry(text)
+                SoundFeedback.playStop()
+            } catch {
+                fileTranscriptionError = error.localizedDescription
+                logger.error("File transcription failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    /// Transcribe an audio file currently on the clipboard (a copied file), if any.
+    func transcribeAudioFromClipboard() {
+        guard let url = Self.audioFileURLOnPasteboard() else {
+            fileTranscriptionError = "No audio file on the clipboard."
+            return
+        }
+        transcribeFile(url)
+    }
+
+    /// The first audio file URL on the general pasteboard, if any.
+    static func audioFileURLOnPasteboard() -> URL? {
+        let urls = NSPasteboard.general.readObjects(forClasses: [NSURL.self]) as? [URL] ?? []
+        return urls.first { url in
+            (try? url.resourceValues(forKeys: [.contentTypeKey]))?.contentType?.conforms(to: .audio) ?? false
+        }
     }
 
 }
