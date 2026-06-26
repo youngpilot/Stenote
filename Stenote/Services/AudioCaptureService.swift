@@ -54,6 +54,11 @@ final class AudioCaptureService: @unchecked Sendable {
         self.onSamples = onSamples
 
         refreshTapIfNeeded()
+        // Clear any resampler filter state left over from a previous session so
+        // each recording starts clean. Safe here (unlike in stopCapture): the
+        // engine is stopped and the tap is inactive, so no render-thread callback
+        // can be touching the converter concurrently.
+        converter?.reset()
         active = true
         if !engine.isRunning {
             engine.prepare()

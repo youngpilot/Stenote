@@ -29,6 +29,10 @@ final class RecordingManager {
     private var recordingStartTime: Date?
     private var startTask: Task<Void, Never>?
     private var audioContinuation: AsyncStream<AVAudioPCMBuffer>.Continuation?
+    /// Set when stop is pressed during the brief "starting" window. A half-started
+    /// ASR can't be torn down cleanly mid-flight, so we let it come up and then
+    /// stop it cleanly (honored in beginCapture).
+    private var stopAfterStart = false
     private var sampleRingBuffer = RingBuffer<Float>(capacity: 16000 * 3, defaultValue: 0)
 
     var currentText: String { transcriptionService.currentText }
@@ -96,6 +100,10 @@ final class RecordingManager {
     func toggle() {
         if isRecording {
             Task { await stopRecording() }
+        } else if isStarting {
+            // Stop pressed during the ~200ms start window — honor it the instant
+            // the recording is actually live (beginCapture checks this flag).
+            stopAfterStart = true
         } else {
             startRecording()
         }
@@ -112,6 +120,7 @@ final class RecordingManager {
 
         // Instant acknowledgement the moment the shortcut registers — yellow icon
         // + start sound — BEFORE the audio engine spins up (~200ms HAL setup).
+        stopAfterStart = false
         isStarting = true
         needsMicrophone = false
         SoundFeedback.playStart()
@@ -156,6 +165,14 @@ final class RecordingManager {
             recordingStartTime = Date()
             needsAccessibility = !AXIsProcessTrusted()
 
+            // Stop was pressed during startup — bring it down cleanly now (before
+            // muting media, so there's no audible blip).
+            if stopAfterStart {
+                stopAfterStart = false
+                Task { await stopRecording() }
+                return
+            }
+
             if SettingsStore.shared.silenceMediaWhileRecording {
                 systemAudio.muteOutput()
             }
@@ -165,6 +182,7 @@ final class RecordingManager {
             // Prefix/suffix are pasted together with the full text when recording stops.
         } catch {
             isStarting = false
+            stopAfterStart = false
             if case AudioCaptureError.microphoneDenied = error {
                 let status = AVCaptureDevice.authorizationStatus(for: .audio)
                 needsMicrophone = (status == .denied || status == .restricted)

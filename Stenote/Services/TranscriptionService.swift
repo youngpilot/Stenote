@@ -287,13 +287,14 @@ final class TranscriptionService {
         // We CLAMP leftContext so the assembled window can never exceed the cap, no
         // matter how the other knobs are tuned later. This makes the failure mode
         // structurally impossible rather than relying on hand-picked numbers.
+        // Clamp BOTH chunk and left context at runtime so the assembled window
+        // (left + chunk + right) can NEVER exceed the cap, regardless of how these
+        // desired values are tuned later — release-safe, not a debug-only assert.
         let encoderWindowCapSeconds = 14.5   // 15s hard cap, minus a 0.5s safety margin
-        let chunkSeconds = 11.0
         let rightContextSeconds = 1.5
+        let chunkSeconds = min(11.0, encoderWindowCapSeconds - rightContextSeconds)
         let maxLeftContextSeconds = max(0, encoderWindowCapSeconds - chunkSeconds - rightContextSeconds)
         let leftContextSeconds = min(2.0, maxLeftContextSeconds)   // desired 2.0s, clamped to fit
-        assert(chunkSeconds + rightContextSeconds <= encoderWindowCapSeconds,
-               "chunk + right context (\(chunkSeconds + rightContextSeconds)s) alone exceeds the encoder window cap")
 
         let config = StreamingAsrConfig(
             chunkSeconds: chunkSeconds,              // good tradeoff for the TDT model
@@ -372,12 +373,21 @@ final class TranscriptionService {
                     }
 
                     // Final, complete transcript. RecordingManager pastes it once.
+                    // Note: this text and FluidAudio's accumulated tokens are
+                    // inherently O(recording length) — the price of a complete
+                    // transcript. The AUDIO path is bounded; this grows only
+                    // ~150 KB/hour, which is negligible.
                     currentText = corrected
                     logger.info("finish (\(corrected.count) chars): \(corrected.prefix(120))…")
                 } else {
+                    // finish() is authoritative: if it produced no final text,
+                    // clear rather than paste a stale streaming-preview fragment.
+                    currentText = ""
                     logger.warning("finish() returned empty text!")
                 }
             } catch {
+                // On a finish() error, keep the last streaming preview as a
+                // best-effort fallback rather than losing everything.
                 logger.error("Streaming ASR finish error: \(error)")
             }
         }

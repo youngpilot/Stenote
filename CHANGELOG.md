@@ -2,6 +2,14 @@
 
 All notable changes to Stenote. Dates are release dates; versions follow the app's `MARKETING_VERSION`.
 
+## 0.8.7
+
+Robustness pass on the recording pipeline:
+- A **stop pressed during the brief start-up window** is now honored instead of ignored.
+- The audio resampler is reset between recordings, so a new recording never inherits the previous session's filter state.
+- The streaming window size is clamped at runtime (not just a debug assert), so it can never exceed the speech model's input limit regardless of future tuning — a permanent guard against the 0.8.6 class of bug.
+- An empty final transcript no longer leaves a stale preview fragment behind.
+
 ## 0.8.6
 
 ### Fixed
