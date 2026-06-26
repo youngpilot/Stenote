@@ -376,51 +376,17 @@ struct MenuBarView: View {
             Divider()
 
             ZStack {
-            // Default status row — also the home of the "update available" install link.
-            HStack(spacing: 6) {
-                if updater.updateAvailable, !recordingManager.isRecording, let url = updater.releaseURL {
-                    Button {
-                        NSWorkspace.shared.open(url)
-                    } label: {
-                        Text("Install Stenote Update (\(updater.currentVersion))→(\(updater.latestVersion ?? ""))")
-                            .font(.caption)
-                            .foregroundStyle(Color.blue)
-                    }
-                    .buttonStyle(.plain)
-                    Spacer()
-                } else {
-                    Circle()
-                        .fill(statusColor)
-                        .frame(width: 8, height: 8)
-                    Text(statusText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    if recordingManager.isRecording, !recordingManager.detectedLanguage.isEmpty {
-                        Text("·")
-                            .foregroundStyle(.tertiary)
-                        Text(recordingManager.detectedLanguage.uppercased())
-                            .font(.body)
-                            .fontWeight(.medium)
-                            .foregroundStyle(.secondary)
-                    }
-                    if recordingManager.isRecording, recordingManager.avgTokenConfidence > 0 {
-                        Text("·")
-                            .foregroundStyle(.tertiary)
-                        Text("\(Int(recordingManager.avgTokenConfidence * 100))%")
-                            .font(.body)
-                            .foregroundStyle(recordingManager.minTokenConfidence < 0.5 ? .orange : .secondary)
-                    }
-                    Spacer()
-                    if !recordingManager.isRecording, !recordingManager.isModelLoading {
-                        let h = recordingManager.historyService
-                        if h.totalRecordings > 0 {
-                            let avgWpm = h.averageWPM
-                            Text("\(formatDuration(h.totalDuration)) · \(formatCharCount(h.totalCharacters)) chars"
-                                 + (avgWpm > 0 ? " · ~\(Int(avgWpm.rounded())) wpm avg" : ""))
-                                .font(.caption)
-                                .foregroundStyle(.quaternary)
-                        }
-                    }
+            // Default status row: one line when status + stats both fit, otherwise
+            // two (status on top, stats below). Also home of the install link.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 6) {
+                    statusLeading
+                    Spacer(minLength: 12)
+                    statusTrailing
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    statusLeading
+                    statusTrailing
                 }
             }
             .opacity(showHoverLayer ? 0 : 1)
@@ -823,6 +789,59 @@ struct MenuBarView: View {
         if showUpToDate { return "Stenote \(v) - Up to date" }
         if updater.lastCheckFailed { return "Stenote \(v) - Check failed, retry" }
         return "Stenote \(v) - Check for Update"
+    }
+
+    /// Left side of the footer status: the install link when an update is pending,
+    /// otherwise the status dot + text (+ live language/confidence while recording).
+    @ViewBuilder private var statusLeading: some View {
+        if updater.updateAvailable, !recordingManager.isRecording, let url = updater.releaseURL {
+            Button {
+                NSWorkspace.shared.open(url)
+            } label: {
+                Text("Install Stenote Update (\(updater.currentVersion))→(\(updater.latestVersion ?? ""))")
+                    .font(.caption)
+                    .foregroundStyle(Color.blue)
+            }
+            .buttonStyle(.plain)
+        } else {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 8, height: 8)
+                Text(statusText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if recordingManager.isRecording, !recordingManager.detectedLanguage.isEmpty {
+                    Text("·")
+                        .foregroundStyle(.tertiary)
+                    Text(recordingManager.detectedLanguage.uppercased())
+                        .font(.body)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.secondary)
+                }
+                if recordingManager.isRecording, recordingManager.avgTokenConfidence > 0 {
+                    Text("·")
+                        .foregroundStyle(.tertiary)
+                    Text("\(Int(recordingManager.avgTokenConfidence * 100))%")
+                        .font(.body)
+                        .foregroundStyle(recordingManager.minTokenConfidence < 0.5 ? .orange : .secondary)
+                }
+            }
+        }
+    }
+
+    /// Right side of the footer status: lifetime stats (idle, with history only).
+    @ViewBuilder private var statusTrailing: some View {
+        if !updater.updateAvailable, !recordingManager.isRecording, !recordingManager.isModelLoading {
+            let h = recordingManager.historyService
+            if h.totalRecordings > 0 {
+                let avgWpm = h.averageWPM
+                Text("\(formatDuration(h.totalDuration)) · \(formatCharCount(h.totalCharacters)) chars"
+                     + (avgWpm > 0 ? " · ~\(Int(avgWpm.rounded())) wpm avg" : ""))
+                    .font(.caption)
+                    .foregroundStyle(.quaternary)
+            }
+        }
     }
 
     private var statusText: String {
