@@ -2,6 +2,17 @@
 
 All notable changes to Stenote. Dates are release dates; versions follow the app's `MARKETING_VERSION`.
 
+## 0.9.0
+
+### Added
+- **Transcribe audio files.** Drag an audio file onto the popover, pick one with the new waveform button in the menubar header, or transcribe an audio file from the clipboard. Files run through the batch speech engine; the result is copied and saved to History.
+
+### Changed
+- **Transcription history is now encrypted at rest** (AES-GCM, key held in the macOS Keychain). Existing plaintext history is migrated automatically on first launch. Recorded audio is still never written to disk.
+
+### Internal
+- Added a unit-test target covering the streaming-window invariant (the guard behind the 0.8.6 fix), trailing-stutter removal, and the AES-GCM encryption primitive.
+
 ## 0.8.7
 
 Robustness pass on the recording pipeline:

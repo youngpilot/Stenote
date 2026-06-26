@@ -34,7 +34,8 @@ In short: Apple Dictation is private but weak, Wispr Flow is polished but cloud 
 - **Global hotkey** — double-press Right ⌥ by default (also Right ⌘, ⌥+Space, Fn+Space, F5, Fn/🌐; several can be active at once). Right-click the menubar icon to toggle.
 - **Mute & pause media** — independently mute system audio and/or pause Spotify & Apple Music while recording (both on by default).
 - **Word corrections** — custom replacements for names and jargon, with optional model boosting.
-- **History** — click any entry to copy; length configurable, from none to unlimited.
+- **Transcribe audio files** — drag a file onto the popover, pick one from the menubar, or transcribe an audio file from the clipboard; the text is copied and saved to History.
+- **History** — click any entry to copy; length configurable, from none to unlimited. Encrypted at rest (AES-GCM, key in the Keychain).
 - **Smart clipboard** — uses a concealed type so clipboard managers ignore pastes, and restores your clipboard afterward.
 - **Voice commands** — say "new line", "new paragraph", "period", "comma", etc.; each command is individually toggleable. Plus optional emoji-by-voice ("smile emoji" → 😊). Opt-in, on-device.
 - **Also** — auto-stop on silence, prefix/suffix text, launch at login, menubar-only (no dock icon).
@@ -49,7 +50,7 @@ English, German, French, Spanish, Italian, Portuguese, Dutch, Polish, Czech, Rom
 
 ## Install
 
-1. Download `Stenote-0.8.7.dmg` from the [latest release](https://github.com/youngpilot/Stenote/releases/latest).
+1. Download `Stenote-0.9.0.dmg` from the [latest release](https://github.com/youngpilot/Stenote/releases/latest).
 2. Open it, drag **Stenote** to Applications, and launch.
 3. Grant **Microphone** and **Accessibility** when prompted. The speech model (~460 MB) downloads once, then runs fully offline.
 
