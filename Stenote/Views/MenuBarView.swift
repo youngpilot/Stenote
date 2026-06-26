@@ -135,13 +135,13 @@ struct MenuBarView: View {
                             Image(nsImage: StenoteApp.micIdleIcon)
                                 .resizable()
                                 .renderingMode(.template)
-                                .frame(width: 15, height: 15)
+                                .frame(width: 14, height: 14)
                         }
-                        Text(recordingManager.isRecording ? "Stop Recording" : "Start Recording")
+                        Text(recordingManager.isRecording ? "Stop" : "Record")
                     }
-                    .fontWeight(.medium)
+                    .font(.system(size: 14, weight: .medium))
                 }
-                .buttonStyle(PopoverButtonStyle(prominent: true))
+                .buttonStyle(GroupedButtonStyle())
                 .disabled(!recordingManager.isModelLoaded)
                 .opacity(topHover ? 1 : 0)
                 .allowsHitTesting(topHover)
@@ -875,6 +875,33 @@ struct MenuBarView: View {
 // MARK: - Button style
 
 /// Borderless button with a clearly visible hover and press highlight.
+/// A standalone rounded control that matches the top-right group's container
+/// (same fill, hairline border, corner radius and 28pt height) — used for the
+/// Record button so the top bar reads as one visual family.
+private struct GroupedButtonStyle: ButtonStyle {
+    @State private var hovering = false
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 12)
+            .frame(height: 28)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.primary.opacity(configuration.isPressed ? 0.16 : (hovering ? 0.12 : 0.06)))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.75)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .opacity(isEnabled ? 1 : 0.4)
+            .onHover { hovering = isEnabled && $0 }
+            .animation(.easeOut(duration: 0.12), value: hovering)
+    }
+}
+
 /// One segment of the compact top-right control group. Full-segment hit target,
 /// subtle per-segment hover/press fill; the group clips the outer corners.
 private struct SegmentButtonStyle: ButtonStyle {
