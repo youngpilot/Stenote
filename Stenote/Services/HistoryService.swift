@@ -1,5 +1,8 @@
 import Foundation
 import Observation
+import os
+
+private let logger = Logger(subsystem: "com.youngpilot.Stenote", category: "History")
 
 struct HistoryEntry: Codable, Identifiable {
     let id: UUID
@@ -30,7 +33,8 @@ final class HistoryService {
     private(set) var totalRecordings: Int = 0
     private(set) var totalDuration: TimeInterval = 0
     private(set) var totalCharacters: Int = 0
-    private let storageKey = "transcriptionHistory"
+    private let storageKey = "transcriptionHistory"          // legacy plaintext (migrated away)
+    private let encStorageKey = "transcriptionHistory.enc"   // AES-GCM ciphertext at rest
 
     private init() {
         loadFromDefaults()
@@ -83,17 +87,39 @@ final class HistoryService {
         }
     }
 
+    /// Load the encrypted history, migrating a legacy plaintext store on first run.
     private func loadFromDefaults() {
-        guard let data = UserDefaults.standard.data(forKey: storageKey) else { return }
-        do {
-            entries = try JSONDecoder().decode([HistoryEntry].self, from: data)
-        } catch {
-            entries = []
+        let ud = UserDefaults.standard
+
+        // Preferred path: the encrypted store.
+        if let blob = ud.data(forKey: encStorageKey) {
+            if let plain = EncryptionService.shared.decrypt(blob),
+               let decoded = try? JSONDecoder().decode([HistoryEntry].self, from: plain) {
+                entries = decoded
+            } else {
+                // Key lost or data tampered — start clean rather than crash.
+                logger.error("History unreadable; starting empty")
+                entries = []
+            }
+            return
+        }
+
+        // One-time migration: legacy plaintext → encrypted, then drop the plaintext.
+        if let legacy = ud.data(forKey: storageKey) {
+            entries = (try? JSONDecoder().decode([HistoryEntry].self, from: legacy)) ?? []
+            saveToDefaults()
+            ud.removeObject(forKey: storageKey)
+            logger.info("Migrated \(self.entries.count) history entries to encrypted storage")
         }
     }
 
+    /// Persist the history encrypted at rest (AES-GCM, key in the Keychain).
     private func saveToDefaults() {
         guard let data = try? JSONEncoder().encode(entries) else { return }
-        UserDefaults.standard.set(data, forKey: storageKey)
+        guard let blob = EncryptionService.shared.encrypt(data) else {
+            logger.error("History not saved: encryption unavailable")
+            return
+        }
+        UserDefaults.standard.set(blob, forKey: encStorageKey)
     }
 }

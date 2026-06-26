@@ -76,7 +76,7 @@ The FluidAudio package resolves automatically; models download on first launch. 
 
 ## Privacy & data
 
-Everything runs on your Mac — audio is transcribed on the Neural Engine and never leaves the device, and the only network request is the optional GitHub update check (off by default). For transparency: your **history**, **word corrections**, and **prefix/suffix** text are stored unencrypted in local app preferences (`~/Library/Preferences/com.youngpilot.Stenote.plist`). History keeps the last 20 entries by default — set it to **None** or clear it any time from Settings, and **Reset to Defaults** wipes corrections and prefixes.
+Everything runs on your Mac — audio is transcribed on the Neural Engine and never leaves the device, the recorded audio is never written to disk, and the only network request is the optional GitHub update check (off by default). Your **transcription history is encrypted at rest** (AES-GCM, with the key held in the macOS Keychain). Your **word corrections** and **prefix/suffix** text are your own configuration and live in local app preferences (`~/Library/Preferences/com.youngpilot.Stenote.plist`). History keeps the last 20 entries by default — set it to **None** or clear it any time from Settings, and **Reset to Defaults** wipes corrections and prefixes.
 
 > `StenoteIM/` is an experimental, not-yet-wired-in system-wide input method — optional, not needed to build or run Stenote.
 
