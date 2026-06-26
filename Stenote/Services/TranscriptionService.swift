@@ -37,6 +37,10 @@ final class TranscriptionService {
     private var isStopping = false          // guard against stale updates during finish()
     private var isCapturing = false         // mic is live; hold audio until ASR is ready
     private var pendingAudio: [AVAudioPCMBuffer] = []  // audio captured before asr.start()
+    private var audioConsumer: Task<Void, Never>?     // lone, serial consumer of the audio stream
+    /// Hard cap on held pre-roll buffers (~50s) so a slow/failed ASR start can
+    /// never grow RAM without bound. Real pre-roll until the ASR is ready is ~1s.
+    private static let maxPrerollBuffers = 600
 
     // --- VAD state (auto-stop) ---
     private var vadBuffer: [Float] = []
@@ -131,6 +135,32 @@ final class TranscriptionService {
         isCapturing = true
     }
 
+    /// Create the single, ordered audio pipeline and start its lone consumer.
+    /// Returns the continuation the audio tap yields into.
+    ///
+    /// CRITICAL: audio must reach the streaming ASR strictly in capture order and
+    /// without overlap. Feeding it from one `Task` per buffer (which bounce
+    /// through the global pool and interleave via actor reentrancy) scrambles the
+    /// timeline and makes the model drop whole chunks mid-recording. One ordered
+    /// `AsyncStream` drained by one serial consumer guarantees in-order delivery.
+    func startAudioPipeline() -> AsyncStream<AVAudioPCMBuffer>.Continuation {
+        audioConsumer?.cancel()
+        let (stream, continuation) = AsyncStream<AVAudioPCMBuffer>.makeStream()
+        audioConsumer = Task { @MainActor [weak self] in
+            for await buffer in stream {
+                await self?.feed(buffer)
+            }
+        }
+        return continuation
+    }
+
+    /// Wait for the consumer to drain every remaining buffer after the
+    /// continuation is finished, so finish() sees the complete audio.
+    func awaitAudioConsumer() async {
+        await audioConsumer?.value
+        audioConsumer = nil
+    }
+
     func startTranscription() async {
         guard isModelLoaded, isCapturing else { return }
         await startStreaming()
@@ -145,26 +175,42 @@ final class TranscriptionService {
         return currentText
     }
 
-    // MARK: - Audio Input
+    // MARK: - Audio Input (single ordered consumer)
 
-    func processAudioBuffer(_ buffer: AVAudioPCMBuffer) async {
+    /// Feed ONE buffer to the ASR, in order. Called only by the lone consumer in
+    /// `startAudioPipeline()`, so calls never overlap and never reorder.
+    private func feed(_ buffer: AVAudioPCMBuffer) async {
         guard isCapturing else { return }
 
-        // Feed the streaming ASR — or hold the audio until it's ready, so the
-        // first words (captured before asr.start() finishes) aren't lost.
+        // Feed the streaming ASR — or hold audio (in order) until it's ready,
+        // then flush the pre-roll before the first live buffer so no words are
+        // lost and nothing is fed out of order.
         if let asr = streamingAsr {
+            if !pendingAudio.isEmpty {
+                let preroll = pendingAudio
+                pendingAudio = []
+                for buf in preroll {
+                    nonisolated(unsafe) let b = buf
+                    await asr.streamAudio(b)
+                }
+            }
             nonisolated(unsafe) let sendableBuffer = buffer
             await asr.streamAudio(sendableBuffer)
         } else {
+            // Hold pre-roll (normally ~1s, until the ASR finishes starting).
+            // Safety cap so a slow or failed ASR start can never grow this
+            // without bound on a long recording — RAM stays bounded regardless.
             pendingAudio.append(buffer)
+            if pendingAudio.count > Self.maxPrerollBuffers {
+                pendingAudio.removeFirst(pendingAudio.count - Self.maxPrerollBuffers)
+            }
         }
 
-        // Extract samples for VAD (auto-stop + paragraph breaks)
+        // Extract samples for VAD (auto-stop)
         guard let channelData = buffer.floatChannelData else { return }
         let count = Int(buffer.frameLength)
         guard count > 0 else { return }
         let samples = Array(UnsafeBufferPointer(start: channelData[0], count: count))
-
         await processVadSamples(samples)
     }
 
@@ -216,21 +262,46 @@ final class TranscriptionService {
     // MARK: - Streaming Transcription
 
     private func startStreaming() async {
-        guard let asrModels else { return }
+        guard let asrModels else {
+            // No models — abort cleanly so feed() stops buffering (bounded RAM).
+            pendingAudio = []
+            isCapturing = false
+            return
+        }
 
         lastConfirmedText = ""
         isStopping = false
         minTokenConfidence = 0
         avgTokenConfidence = 0
 
-        // Tuned config: faster confirmations, more context, lower latency
+        // --- Streaming window MUST fit the encoder's fixed input ---
+        // The Parakeet encoder input is hard-fixed at 15s / 240,000 samples
+        // (FluidAudio ASRConstants.maxModelSamples). Each streaming window is
+        // leftContext + chunk + rightContext. If that exceeds the cap, the encoder
+        // throws a shape error that FluidAudio SILENTLY swallows (processWindow's
+        // catch drops the whole chunk: no tokens, no update). That is exactly what
+        // made the middle of long recordings vanish — window 1 has no left context
+        // yet and the final flush has no right context, so only the middle windows
+        // (left+chunk+right = full size) overflowed.
+        //
+        // We CLAMP leftContext so the assembled window can never exceed the cap, no
+        // matter how the other knobs are tuned later. This makes the failure mode
+        // structurally impossible rather than relying on hand-picked numbers.
+        let encoderWindowCapSeconds = 14.5   // 15s hard cap, minus a 0.5s safety margin
+        let chunkSeconds = 11.0
+        let rightContextSeconds = 1.5
+        let maxLeftContextSeconds = max(0, encoderWindowCapSeconds - chunkSeconds - rightContextSeconds)
+        let leftContextSeconds = min(2.0, maxLeftContextSeconds)   // desired 2.0s, clamped to fit
+        assert(chunkSeconds + rightContextSeconds <= encoderWindowCapSeconds,
+               "chunk + right context (\(chunkSeconds + rightContextSeconds)s) alone exceeds the encoder window cap")
+
         let config = StreamingAsrConfig(
-            chunkSeconds: 11.0,              // Good tradeoff for the TDT batch model
-            hypothesisChunkSeconds: 0.5,     // Faster preview updates
-            leftContextSeconds: 3.0,         // Better accuracy at chunk edges
-            rightContextSeconds: 1.5,        // 0.5s less latency
-            minContextForConfirmation: 5.0,  // Confirm text ~5s after speech
-            confirmationThreshold: 0.85      // Stricter to compensate for less context
+            chunkSeconds: chunkSeconds,              // good tradeoff for the TDT model
+            hypothesisChunkSeconds: 0.5,             // faster preview updates
+            leftContextSeconds: leftContextSeconds,  // clamped so window <= encoder cap
+            rightContextSeconds: rightContextSeconds,
+            minContextForConfirmation: 5.0,          // confirm text ~5s after speech
+            confirmationThreshold: 0.85              // stricter to compensate for less left context
         )
         let asr = StreamingAsrManager(config: config)
 
@@ -255,21 +326,17 @@ final class TranscriptionService {
         do {
             try await asr.start(models: asrModels.value, source: .microphone)
         } catch {
+            // ASR failed to start: stop buffering so pendingAudio can't grow
+            // without bound (bounded RAM); the session ends with no text.
             logger.error("Failed to start streaming ASR: \(error)")
+            pendingAudio = []
+            isCapturing = false
             return
         }
 
         streamingAsr = asr
-
-        // Feed any audio captured before the ASR finished starting.
-        if !pendingAudio.isEmpty {
-            let buffered = pendingAudio
-            pendingAudio = []
-            for buf in buffered {
-                nonisolated(unsafe) let sendable = buf
-                await asr.streamAudio(sendable)
-            }
-        }
+        // Pre-roll is flushed by the single audio consumer (`feed`), in capture
+        // order — never from two places at once.
 
         updateTask = Task { [weak self] in
             for await update in await asr.transcriptionUpdates {

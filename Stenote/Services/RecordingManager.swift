@@ -17,7 +17,6 @@ final class RecordingManager {
     private let hotkeyService = HotkeyService()
     private let systemAudio = SystemAudioService.shared
     let historyService = HistoryService.shared
-    private let pendingAudioTasks = PendingTaskCounter()
 
     private(set) var isRecording = false
     private(set) var isStarting = false   // shortcut registered, engine spinning up (yellow)
@@ -29,6 +28,7 @@ final class RecordingManager {
     private(set) var needsMicrophone = false
     private var recordingStartTime: Date?
     private var startTask: Task<Void, Never>?
+    private var audioContinuation: AsyncStream<AVAudioPCMBuffer>.Continuation?
     private var sampleRingBuffer = RingBuffer<Float>(capacity: 16000 * 3, defaultValue: 0)
 
     var currentText: String { transcriptionService.currentText }
@@ -128,17 +128,15 @@ final class RecordingManager {
     private func beginCapture() {
         guard isStarting, !isRecording else { return }
 
-        let counter = pendingAudioTasks
+        // Single ordered audio path: the tap yields into one stream that one
+        // serial consumer drains in capture order (no per-buffer Tasks, no race).
+        let continuation = transcriptionService.startAudioPipeline()
+        audioContinuation = continuation
         do {
             try audioCaptureService.startCapture(
-                onBuffer: { [weak self] buffer in
-                    nonisolated(unsafe) let sendableBuffer = buffer
-                    counter.increment()
-                    Task { @MainActor in
-                        defer { counter.decrement() }
-                        guard let self else { return }
-                        await self.transcriptionService.processAudioBuffer(sendableBuffer)
-                    }
+                onBuffer: { buffer in
+                    nonisolated(unsafe) let b = buffer
+                    continuation.yield(b)
                 },
                 onLevel: { [weak self] level in
                     Task { @MainActor in
@@ -188,15 +186,16 @@ final class RecordingManager {
         systemAudio.resumeMediaApps()
         SoundFeedback.playStop()
 
-        // Ensure the ASR finished starting (and any buffered audio was flushed)
-        // before we finish — so even a very short recording keeps its text.
+        // Ensure the ASR finished starting before we feed the tail / finish.
         await startTask?.value
         startTask = nil
 
-        // Drain in-flight audio Tasks before stopping transcription.
-        // stopCapture() prevents new callbacks, but queued MainActor Tasks
-        // may still need to call streamAudio(). Each sleep yields MainActor.
-        await drainPendingAudioTasks()
+        // Close the ordered audio pipeline and wait for the lone consumer to
+        // feed every remaining buffer (in capture order) into the ASR before we
+        // finish — deterministic, no fixed-timeout drain.
+        audioContinuation?.finish()
+        audioContinuation = nil
+        await transcriptionService.awaitAudioConsumer()
 
         let finalText = await transcriptionService.stopTranscription()
 
@@ -237,18 +236,6 @@ final class RecordingManager {
         outputService.endSession()
     }
 
-    /// Wait for all in-flight audio processing Tasks to complete.
-    /// Each iteration yields MainActor so queued Tasks can execute.
-    private func drainPendingAudioTasks() async {
-        for _ in 0..<40 { // max ~200ms
-            if pendingAudioTasks.count == 0 { break }
-            try? await Task.sleep(for: .milliseconds(5))
-        }
-        let remaining = pendingAudioTasks.count
-        if remaining > 0 {
-            logger.warning("Audio drain timeout: \(remaining) tasks still pending")
-        }
-    }
 }
 
 // MARK: - Sound Feedback
@@ -261,13 +248,4 @@ enum SoundFeedback {
     static func playStop() {
         NSSound(named: "Bottle")?.play()
     }
-}
-
-/// Thread-safe counter for tracking in-flight audio processing Tasks.
-final class PendingTaskCounter: Sendable {
-    private let _count = OSAllocatedUnfairLock(initialState: 0)
-
-    func increment() { _count.withLock { $0 += 1 } }
-    func decrement() { _count.withLock { $0 -= 1 } }
-    var count: Int { _count.withLock { $0 } }
 }

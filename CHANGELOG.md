@@ -2,6 +2,11 @@
 
 All notable changes to Stenote. Dates are release dates; versions follow the app's `MARKETING_VERSION`.
 
+## 0.8.6
+
+### Fixed
+- **Long recordings no longer lose the middle.** The streaming recognizer assembled each window as left-context + chunk + right-context = 15.5 s, which exceeds the speech model's fixed 15 s input. Every middle window overflowed and was silently discarded, so only the start and end of a long dictation survived. The window now fits the model with margin (and is clamped so it can never regress). Audio is also delivered to the recognizer through a single in-order pipeline (no out-of-order or overlapping buffers), and pre-roll buffering is bounded, so memory stays flat on arbitrarily long recordings.
+
 ## 0.8.5
 
 ### Fixed
