@@ -384,15 +384,17 @@ struct MenuBarView: View {
                     Spacer(minLength: 12)
                     statusTrailing
                 }
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .center, spacing: 3) {
                     statusLeading
                     statusTrailing
                 }
+                .frame(maxWidth: .infinity)
             }
             .opacity(showHoverLayer ? 0 : 1)
 
-            // Revealed on hover (only when there is no pending update to install)
+            // Revealed on hover (only when there is no pending update to install) — centered.
             HStack {
+                Spacer()
                 Button {
                     Task {
                         await updater.checkNow()
