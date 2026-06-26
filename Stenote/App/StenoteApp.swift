@@ -60,10 +60,11 @@ struct StenoteApp: App {
         let bucket = Int((clamped * Float(steps - 1)).rounded())
         if let cached = recordingIconCache[bucket] { return cached }
         let t = Double(bucket) / Double(steps - 1)
-        // light red (#F6A6A6, silence) → heavy red (#D81A1A, loud)
-        let r = 0.965 + (0.847 - 0.965) * t
-        let g = 0.651 + (0.102 - 0.651) * t
-        let b = 0.651 + (0.102 - 0.651) * t
+        // Always clearly red (never the amber warm-up): soft-but-solid red
+        // (#EA5A5A, silence) → heavy red (#C81E1E, loud).
+        let r = 0.918 + (0.784 - 0.918) * t
+        let g = 0.353 + (0.118 - 0.353) * t
+        let b = 0.353 + (0.118 - 0.353) * t
         let hex = String(format: "#%02X%02X%02X",
                          Int((r * 255).rounded()), Int((g * 255).rounded()), Int((b * 255).rounded()))
         let icon = coloredMicIcon(top: hex)
