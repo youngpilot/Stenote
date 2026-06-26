@@ -55,6 +55,7 @@ struct MenuBarView: View {
             }
         }
         .animation(.easeInOut(duration: 0.12), value: fileDropTargeted)
+        .animation(.easeInOut(duration: 0.2), value: recordingManager.statusMessage)
     }
 
     /// Whether a dragged/picked URL is an audio file we can transcribe.
@@ -233,12 +234,12 @@ struct MenuBarView: View {
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
         }
 
-        // File transcription error
-        if let fileError = recordingManager.fileTranscriptionError {
+        // Transient status (copied / saved / file errors) — auto-dismissed
+        if let status = recordingManager.statusMessage {
             HStack(spacing: 6) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.red)
-                Text(fileError)
+                Image(systemName: status.isError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                    .foregroundStyle(status.isError ? .red : .green)
+                Text(status.text)
                     .font(.body)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
@@ -246,7 +247,9 @@ struct MenuBarView: View {
             }
             .padding(DesignTokens.Spacing.s)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.red.opacity(0.3), lineWidth: 0.5))
+            .overlay(RoundedRectangle(cornerRadius: 8)
+                .strokeBorder((status.isError ? Color.red : Color.green).opacity(0.3), lineWidth: 0.5))
+            .transition(.opacity)
         }
 
         // Microphone permission warning

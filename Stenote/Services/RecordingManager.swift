@@ -28,7 +28,8 @@ final class RecordingManager {
     private(set) var needsMicrophone = false
     private(set) var isTranscribingFile = false
     private(set) var fileTranscriptionName: String?
-    private(set) var fileTranscriptionError: String?
+    private(set) var statusMessage: StatusMessage?
+    private var statusClearTask: Task<Void, Never>?
     private var recordingStartTime: Date?
     private var startTask: Task<Void, Never>?
     private var audioContinuation: AsyncStream<AVAudioPCMBuffer>.Continuation?
@@ -260,7 +261,7 @@ final class RecordingManager {
     func transcribeFile(_ url: URL) {
         guard !isRecording, !isStarting, !isTranscribingFile,
               transcriptionService.isModelLoaded else { return }
-        fileTranscriptionError = nil
+        statusMessage = nil
         isTranscribingFile = true
         fileTranscriptionName = url.lastPathComponent
         Task { @MainActor in
@@ -268,15 +269,16 @@ final class RecordingManager {
             do {
                 let text = try await transcriptionService.transcribeFile(url: url)
                 guard !text.isEmpty else {
-                    fileTranscriptionError = "No speech found in that file."
+                    showStatus("No speech found in that file.", isError: true)
                     return
                 }
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(text, forType: .string)
                 historyService.addEntry(text)
                 SoundFeedback.playStop()
+                showStatus("Saved to history · copied")
             } catch {
-                fileTranscriptionError = error.localizedDescription
+                showStatus(error.localizedDescription, isError: true)
                 logger.error("File transcription failed: \(error.localizedDescription)")
             }
         }
@@ -285,10 +287,22 @@ final class RecordingManager {
     /// Transcribe an audio file currently on the clipboard (a copied file), if any.
     func transcribeAudioFromClipboard() {
         guard let url = Self.audioFileURLOnPasteboard() else {
-            fileTranscriptionError = "No audio file on the clipboard."
+            showStatus("No audio file on the clipboard.", isError: true)
             return
         }
         transcribeFile(url)
+    }
+
+    /// Show a transient one-line status (auto-dismissed). Errors linger a little
+    /// longer so they can be read. One line, no queue — replaces any prior message.
+    func showStatus(_ text: String, isError: Bool = false) {
+        statusMessage = StatusMessage(text: text, isError: isError)
+        statusClearTask?.cancel()
+        statusClearTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(isError ? 4.0 : 2.5))
+            guard !Task.isCancelled else { return }
+            statusMessage = nil
+        }
     }
 
     /// The first audio file URL on the general pasteboard, if any.
@@ -299,6 +313,12 @@ final class RecordingManager {
         }
     }
 
+}
+
+/// A transient, auto-dismissed status line shown in the popover.
+struct StatusMessage: Equatable {
+    let text: String
+    let isError: Bool
 }
 
 // MARK: - Sound Feedback
