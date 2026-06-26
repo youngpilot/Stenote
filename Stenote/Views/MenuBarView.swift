@@ -32,7 +32,7 @@ struct MenuBarView: View {
             }
         }
         .padding(DesignTokens.Spacing.m)
-        .frame(width: 320)
+        .frame(width: 360)
         .contentShape(Rectangle())
         .focusEffectDisabled()
         .dropDestination(for: URL.self) { urls, _ in
@@ -76,6 +76,13 @@ struct MenuBarView: View {
         if panel.runModal() == .OK, let url = panel.url {
             recordingManager.transcribeFile(url)
         }
+    }
+
+    /// Thin separator between segments of the top-right control group.
+    private var segmentDivider: some View {
+        Rectangle()
+            .fill(Color.primary.opacity(0.10))
+            .frame(width: 1, height: 16)
     }
 
     // MARK: - Main View
@@ -141,47 +148,65 @@ struct MenuBarView: View {
             }
             .onHover { topHover = $0 }
 
-            Spacer()
+            Spacer(minLength: 8)
 
-            Button {
-                pickAudioFile()
-            } label: {
-                if recordingManager.isTranscribingFile {
-                    ProgressView().controlSize(.small)
-                        .frame(width: 16, height: 16)
-                } else {
-                    Image(systemName: "waveform.badge.plus")
-                        .frame(width: 16, height: 16)
+            // Compact control group: transcribe a file · settings · quit
+            HStack(spacing: 0) {
+                Button {
+                    pickAudioFile()
+                } label: {
+                    Group {
+                        if recordingManager.isTranscribingFile {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: "waveform.badge.plus")
+                        }
+                    }
+                    .frame(width: 36, height: 28)
                 }
-            }
-            .buttonStyle(PopoverButtonStyle())
-            .disabled(!recordingManager.isModelLoaded || recordingManager.isRecording
-                      || recordingManager.isStarting || recordingManager.isTranscribingFile)
-            .help("Transcribe an audio file (or drop one here)")
-            .accessibilityLabel("Transcribe an audio file")
+                .buttonStyle(SegmentButtonStyle())
+                .disabled(!recordingManager.isModelLoaded || recordingManager.isRecording
+                          || recordingManager.isStarting || recordingManager.isTranscribingFile)
+                .help("Transcribe an audio file (or drop one here)")
+                .accessibilityLabel("Transcribe an audio file")
 
-            Button {
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    showSettings = true
+                segmentDivider
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.15)) { showSettings = true }
+                } label: {
+                    Image(systemName: "gearshape.fill")
+                        .frame(width: 36, height: 28)
                 }
-            } label: {
-                Image(systemName: "gearshape.fill")
-                    .frame(width: 16, height: 16)
-            }
-            .keyboardShortcut(",", modifiers: .command)
-            .buttonStyle(PopoverButtonStyle())
-            .accessibilityLabel("Settings")
+                .buttonStyle(SegmentButtonStyle())
+                .keyboardShortcut(",", modifiers: .command)
+                .help("Settings")
+                .accessibilityLabel("Settings")
 
-            Button {
-                NSApplication.shared.terminate(nil)
-            } label: {
-                Image(systemName: "xmark")
-                    .fontWeight(.medium)
-                    .frame(width: 16, height: 16)
+                segmentDivider
+
+                Button {
+                    NSApplication.shared.terminate(nil)
+                } label: {
+                    Image(systemName: "xmark")
+                        .frame(width: 36, height: 28)
+                }
+                .buttonStyle(SegmentButtonStyle())
+                .keyboardShortcut("q", modifiers: .command)
+                .help("Quit Stenote")
+                .accessibilityLabel("Quit Stenote")
             }
-            .keyboardShortcut("q", modifiers: .command)
-            .buttonStyle(PopoverButtonStyle())
-            .accessibilityLabel("Quit Stenote")
+            .font(.system(size: 14, weight: .medium))
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.primary.opacity(0.06))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.75)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .fixedSize()
         }
 
         // Model loading progress
@@ -831,6 +856,23 @@ struct MenuBarView: View {
 // MARK: - Button style
 
 /// Borderless button with a clearly visible hover and press highlight.
+/// One segment of the compact top-right control group. Full-segment hit target,
+/// subtle per-segment hover/press fill; the group clips the outer corners.
+private struct SegmentButtonStyle: ButtonStyle {
+    @State private var hovering = false
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(.primary)
+            .background(Color.primary.opacity(configuration.isPressed ? 0.18 : (hovering ? 0.10 : 0)))
+            .contentShape(Rectangle())
+            .opacity(isEnabled ? 1 : 0.4)
+            .onHover { hovering = isEnabled && $0 }
+            .animation(.easeOut(duration: 0.12), value: hovering)
+    }
+}
+
 private struct PopoverButtonStyle: ButtonStyle {
     var prominent = false
     @State private var hovering = false
