@@ -7,6 +7,7 @@ struct MenuBarView: View {
     @State private var audioService = SystemAudioService.shared
     @State private var updater = UpdateService.shared
     @State private var footerHover = false
+    @State private var showUpToDate = false
     @State private var topHover = false
     @State private var copiedFeedback = false
     @State private var copyCardHover = false
@@ -350,66 +351,83 @@ struct MenuBarView: View {
             Divider()
 
             ZStack {
+            // Default status row — also the home of the "update available" install link.
             HStack(spacing: 6) {
-                Circle()
-                    .fill(statusColor)
-                    .frame(width: 8, height: 8)
-                Text(statusText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                if recordingManager.isRecording, !recordingManager.detectedLanguage.isEmpty {
-                    Text("·")
-                        .foregroundStyle(.tertiary)
-                    Text(recordingManager.detectedLanguage.uppercased())
-                        .font(.body)
-                        .fontWeight(.medium)
-                        .foregroundStyle(.secondary)
-                }
-                if recordingManager.isRecording, recordingManager.avgTokenConfidence > 0 {
-                    Text("·")
-                        .foregroundStyle(.tertiary)
-                    Text("\(Int(recordingManager.avgTokenConfidence * 100))%")
-                        .font(.body)
-                        .foregroundStyle(recordingManager.minTokenConfidence < 0.5 ? .orange : .secondary)
-                }
-                Spacer()
-                if !recordingManager.isRecording, !recordingManager.isModelLoading {
-                    let h = recordingManager.historyService
-                    if h.totalRecordings > 0 {
-                        let avgWpm = h.averageWPM
-                        Text("\(formatDuration(h.totalDuration)) · \(formatCharCount(h.totalCharacters)) chars"
-                             + (avgWpm > 0 ? " · ~\(Int(avgWpm.rounded())) wpm avg" : ""))
+                if updater.updateAvailable, !recordingManager.isRecording, let url = updater.releaseURL {
+                    Button {
+                        NSWorkspace.shared.open(url)
+                    } label: {
+                        Text("Install Stenote Update (\(updater.currentVersion))→(\(updater.latestVersion ?? ""))")
                             .font(.caption)
-                            .foregroundStyle(.quaternary)
+                            .foregroundStyle(Color.blue)
+                    }
+                    .buttonStyle(.plain)
+                    Spacer()
+                } else {
+                    Circle()
+                        .fill(statusColor)
+                        .frame(width: 8, height: 8)
+                    Text(statusText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if recordingManager.isRecording, !recordingManager.detectedLanguage.isEmpty {
+                        Text("·")
+                            .foregroundStyle(.tertiary)
+                        Text(recordingManager.detectedLanguage.uppercased())
+                            .font(.body)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.secondary)
+                    }
+                    if recordingManager.isRecording, recordingManager.avgTokenConfidence > 0 {
+                        Text("·")
+                            .foregroundStyle(.tertiary)
+                        Text("\(Int(recordingManager.avgTokenConfidence * 100))%")
+                            .font(.body)
+                            .foregroundStyle(recordingManager.minTokenConfidence < 0.5 ? .orange : .secondary)
+                    }
+                    Spacer()
+                    if !recordingManager.isRecording, !recordingManager.isModelLoading {
+                        let h = recordingManager.historyService
+                        if h.totalRecordings > 0 {
+                            let avgWpm = h.averageWPM
+                            Text("\(formatDuration(h.totalDuration)) · \(formatCharCount(h.totalCharacters)) chars"
+                                 + (avgWpm > 0 ? " · ~\(Int(avgWpm.rounded())) wpm avg" : ""))
+                                .font(.caption)
+                                .foregroundStyle(.quaternary)
+                        }
                     }
                 }
             }
-            .opacity(footerHover ? 0 : 1)
+            .opacity(showHoverLayer ? 0 : 1)
 
-            // Revealed on hover
+            // Revealed on hover (only when there is no pending update to install)
             HStack {
                 Button {
-                    if let url = URL(string: "https://github.com/youngpilot/Stenote") {
-                        NSWorkspace.shared.open(url)
+                    Task {
+                        await updater.checkNow()
+                        if !updater.updateAvailable {
+                            showUpToDate = true
+                            try? await Task.sleep(for: .seconds(2.5))
+                            showUpToDate = false
+                        }
                     }
                 } label: {
                     HStack(spacing: 6) {
-                        // Info glyph sized + spaced exactly like the status dot above.
-                        Image(systemName: "info.circle")
+                        // Glyph sized + spaced exactly like the status dot above.
+                        Image(systemName: "arrow.triangle.2.circlepath")
                             .resizable()
                             .scaledToFit()
                             .frame(width: 8, height: 8)
-                        Text("Stenote on GitHub →")
+                        Text(checkForUpdateLabel)
                     }
                 }
                 .buttonStyle(LinkHoverButtonStyle())
+                .disabled(updater.isChecking)
                 Spacer()
-                Text("Stenote v\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
-                    .foregroundStyle(.quaternary)
             }
             .font(.caption)
-            .opacity(footerHover ? 1 : 0)
-            .allowsHitTesting(footerHover)
+            .opacity(showHoverLayer ? 1 : 0)
+            .allowsHitTesting(showHoverLayer)
             }
         }
         .contentShape(Rectangle())
@@ -766,6 +784,20 @@ struct MenuBarView: View {
         let days = hours / 24
         if days == 1 { return "yesterday" }
         return "\(days) days ago"
+    }
+
+    /// The hover row (Check for Update) is only revealed when there isn't already
+    /// an update to install — otherwise the install link stays put and clickable.
+    private var showHoverLayer: Bool {
+        footerHover && !updater.updateAvailable
+    }
+
+    private var checkForUpdateLabel: String {
+        let v = updater.currentVersion
+        if updater.isChecking { return "Stenote \(v) - Checking…" }
+        if showUpToDate { return "Stenote \(v) - Up to date" }
+        if updater.lastCheckFailed { return "Stenote \(v) - Check failed, retry" }
+        return "Stenote \(v) - Check for Update"
     }
 
     private var statusText: String {
