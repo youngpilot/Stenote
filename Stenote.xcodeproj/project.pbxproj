@@ -32,6 +32,7 @@
 		A10001000000000000000201 /* StutterRemovalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000201 /* StutterRemovalTests.swift */; };
 		A10001000000000000000202 /* EncryptionServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000202 /* EncryptionServiceTests.swift */; };
 		A10001000000000000000203 /* WPMTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000203 /* WPMTests.swift */; };
+		A10001000000000000000204 /* StatFormatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000204 /* StatFormatTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -63,6 +64,7 @@
 		A10002000000000000000201 /* StutterRemovalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StutterRemovalTests.swift; sourceTree = "<group>"; };
 		A10002000000000000000202 /* EncryptionServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EncryptionServiceTests.swift; sourceTree = "<group>"; };
 		A10002000000000000000203 /* WPMTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WPMTests.swift; sourceTree = "<group>"; };
+		A10002000000000000000204 /* StatFormatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatFormatTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -108,6 +110,7 @@
 				A10002000000000000000201 /* StutterRemovalTests.swift */,
 				A10002000000000000000202 /* EncryptionServiceTests.swift */,
 				A10002000000000000000203 /* WPMTests.swift */,
+				A10002000000000000000204 /* StatFormatTests.swift */,
 			);
 			path = StenoteTests;
 			sourceTree = "<group>";
@@ -309,6 +312,7 @@
 				A10001000000000000000201 /* StutterRemovalTests.swift in Sources */,
 				A10001000000000000000202 /* EncryptionServiceTests.swift in Sources */,
 				A10001000000000000000203 /* WPMTests.swift in Sources */,
+				A10001000000000000000204 /* StatFormatTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

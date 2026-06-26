@@ -622,6 +622,10 @@ struct MenuBarView: View {
                 Text(roughTimestamp(entry.timestamp))
                 Text("·").foregroundStyle(.quaternary)
                 Text("\(entry.text.count) chars")
+                if let wpm = entry.wpm {
+                    Text("·").foregroundStyle(.quaternary)
+                    Text("\(Int(wpm.rounded())) wpm")
+                }
             }
             .font(.caption)
             .foregroundStyle(.tertiary)
@@ -838,8 +842,8 @@ struct MenuBarView: View {
             let h = recordingManager.historyService
             if h.totalRecordings > 0 {
                 let avgWpm = h.averageWPM
-                Text("\(formatDuration(h.totalDuration)) · \(formatCharCount(h.totalCharacters)) chars"
-                     + (avgWpm > 0 ? " · ~\(Int(avgWpm.rounded())) wpm avg" : ""))
+                Text("\(StatFormat.totalDuration(h.totalDuration)) · \(formatCharCount(h.totalCharacters)) chars"
+                     + (avgWpm > 0 ? " · \(Int(avgWpm.rounded())) wpm avg" : ""))
                     .font(.caption)
                     .foregroundStyle(.quaternary)
             }
@@ -877,6 +881,26 @@ struct MenuBarView: View {
 // MARK: - Button style
 
 /// Borderless button with a clearly visible hover and press highlight.
+/// Number/stat formatting for the footer. Pure + testable.
+enum StatFormat {
+    /// Lifetime duration, rounded to whole minutes: "17 minutes" / "1 minute"
+    /// under an hour; "1,5 hours" / "2 hours" / "1 hour" at or above one hour
+    /// (one decimal, German comma, whole values shown without a decimal).
+    static func totalDuration(_ seconds: TimeInterval) -> String {
+        let minutes = Int((max(0, seconds) / 60).rounded())
+        if minutes < 60 {
+            return "\(minutes) minute\(minutes == 1 ? "" : "s")"
+        }
+        let hours = (Double(minutes) / 60.0 * 10).rounded() / 10   // one decimal place
+        if hours == hours.rounded() {
+            let h = Int(hours)
+            return "\(h) hour\(h == 1 ? "" : "s")"
+        }
+        let text = String(format: "%.1f", hours).replacingOccurrences(of: ".", with: ",")
+        return "\(text) hours"
+    }
+}
+
 /// A standalone rounded control that matches the top-right group's container
 /// (same fill, hairline border, corner radius and 28pt height) — used for the
 /// Record button so the top bar reads as one visual family.
