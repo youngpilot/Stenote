@@ -3,15 +3,12 @@ import SwiftUI
 @main
 struct StenoteApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @State private var recordingManager = RecordingManager.shared
 
     var body: some Scene {
         MenuBarExtra {
             MenuBarView()
         } label: {
-            Image(nsImage: recordingManager.isStarting
-                ? Self.micStartingIcon
-                : (recordingManager.isRecording ? Self.micRecordingIcon : Self.micIdleIcon))
+            MenuBarLabel()
         }
         .menuBarExtraStyle(.window)
     }
@@ -66,4 +63,34 @@ struct StenoteApp: App {
         image.isTemplate = false
         return image
     }()
+}
+
+/// The menubar status item. While recording, the red mic gently breathes
+/// (opacity) so "it's listening" reads at a glance — a menubar app's only
+/// always-visible surface. The pulse loop only runs while recording (no idle
+/// timer), and it's a status item, not a Liquid-Glass tap target.
+private struct MenuBarLabel: View {
+    @State private var recordingManager = RecordingManager.shared
+    @State private var dimmed = false
+
+    var body: some View {
+        Image(nsImage: icon)
+            .opacity(recordingManager.isRecording && dimmed ? 0.55 : 1.0)
+            .animation(.easeInOut(duration: 0.6), value: dimmed)
+            .task(id: recordingManager.isRecording) {
+                dimmed = false
+                guard recordingManager.isRecording else { return }
+                while !Task.isCancelled && recordingManager.isRecording {
+                    dimmed.toggle()
+                    try? await Task.sleep(for: .milliseconds(600))
+                }
+                dimmed = false
+            }
+    }
+
+    private var icon: NSImage {
+        recordingManager.isStarting
+            ? StenoteApp.micStartingIcon
+            : (recordingManager.isRecording ? StenoteApp.micRecordingIcon : StenoteApp.micIdleIcon)
+    }
 }
