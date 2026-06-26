@@ -5,7 +5,7 @@ All notable changes to Stenote. Dates are release dates; versions follow the app
 ## 1.0.1
 
 ### Added
-- **Live recording level in the menubar** — while recording, the red mic glyph now tracks your voice: a light red in silence, deepening to a heavy red as you get louder.
+- **Live level in the menubar** — while recording, the mic glyph is a steady orange and a deep-red level rises inside the mic head with your voice, with a gentle wavy top — a tiny live waveform. (The separate amber "starting" state is gone; recording shows immediately.)
 - **Menubar icon reflects file transcription** — the mic glyph turns a calm **blue** while transcribing an audio file, then a calm **green** when the result is ready, clearing back to default the next time you open the popover.
 
 ## 1.0.0
