@@ -23,6 +23,20 @@ final class EncryptionService {
     /// only if the key is unavailable — callers should treat that as "don't write".
     func encrypt(_ data: Data) -> Data? {
         guard let key = key() else { return nil }
+        return Self.seal(data, with: key)
+    }
+
+    /// Decrypt a blob produced by `encrypt`. Returns nil on a missing key or
+    /// tampered/corrupt data.
+    func decrypt(_ data: Data) -> Data? {
+        guard let key = key() else { return nil }
+        return Self.open(data, with: key)
+    }
+
+    // MARK: - Crypto (pure; key is injected so it's testable without the Keychain)
+
+    /// AES-GCM seal → self-describing blob (nonce + ciphertext + tag).
+    static func seal(_ data: Data, with key: SymmetricKey) -> Data? {
         do {
             return try AES.GCM.seal(data, using: key).combined
         } catch {
@@ -31,10 +45,8 @@ final class EncryptionService {
         }
     }
 
-    /// Decrypt a blob produced by `encrypt`. Returns nil on a missing key or
-    /// tampered/corrupt data.
-    func decrypt(_ data: Data) -> Data? {
-        guard let key = key() else { return nil }
+    /// AES-GCM open of a blob from `seal`. Returns nil on a wrong key or tampered data.
+    static func open(_ data: Data, with key: SymmetricKey) -> Data? {
         do {
             let box = try AES.GCM.SealedBox(combined: data)
             return try AES.GCM.open(box, using: key)

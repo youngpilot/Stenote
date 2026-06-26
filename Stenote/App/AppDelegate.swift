@@ -9,6 +9,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var windowObserver: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Under XCTest the app is only a test host — skip the heavy bootstrap
+        // (model download, mic/accessibility prompts, global hotkey monitor).
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil { return }
         logger.info("Stenote launching...")
         installRightClickMonitor()
         configureMenuBarPanel()

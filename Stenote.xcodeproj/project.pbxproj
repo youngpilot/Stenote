@@ -28,6 +28,9 @@
 		D5CC79748A1542A3AC4C6717 /* VoiceCommandService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5178128DCCD441D8396BC03 /* VoiceCommandService.swift */; };
 		204855D3C2B24E5697EDEAFD /* RingBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EFC8E0F196644678C25C326 /* RingBuffer.swift */; };
 		59A7FA083FE74BA3912763C0 /* WaveformView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 241AD4F7F22E4384AD139523 /* WaveformView.swift */; };
+		A10001000000000000000200 /* StreamingWindowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000200 /* StreamingWindowTests.swift */; };
+		A10001000000000000000201 /* StutterRemovalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000201 /* StutterRemovalTests.swift */; };
+		A10001000000000000000202 /* EncryptionServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000202 /* EncryptionServiceTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -54,10 +57,21 @@
 		A5178128DCCD441D8396BC03 /* VoiceCommandService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCommandService.swift; sourceTree = "<group>"; };
 		1EFC8E0F196644678C25C326 /* RingBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RingBuffer.swift; sourceTree = "<group>"; };
 		241AD4F7F22E4384AD139523 /* WaveformView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaveformView.swift; sourceTree = "<group>"; };
+		A10003000000000000000002 /* StenoteTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = StenoteTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10002000000000000000200 /* StreamingWindowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingWindowTests.swift; sourceTree = "<group>"; };
+		A10002000000000000000201 /* StutterRemovalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StutterRemovalTests.swift; sourceTree = "<group>"; };
+		A10002000000000000000202 /* EncryptionServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EncryptionServiceTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		A10004000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A10004000000000000000002 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -71,6 +85,7 @@
 			isa = PBXGroup;
 			children = (
 				A10005000000000000000002 /* Stenote */,
+				A10005000000000000000100 /* StenoteTests */,
 				A10005000000000000000099 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -79,8 +94,19 @@
 			isa = PBXGroup;
 			children = (
 				A10003000000000000000001 /* Stenote.app */,
+				A10003000000000000000002 /* StenoteTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		A10005000000000000000100 /* StenoteTests */ = {
+			isa = PBXGroup;
+			children = (
+				A10002000000000000000200 /* StreamingWindowTests.swift */,
+				A10002000000000000000201 /* StutterRemovalTests.swift */,
+				A10002000000000000000202 /* EncryptionServiceTests.swift */,
+			);
+			path = StenoteTests;
 			sourceTree = "<group>";
 		};
 		A10005000000000000000002 /* Stenote */ = {
@@ -175,6 +201,23 @@
 			productReference = A10003000000000000000001 /* Stenote.app */;
 			productType = "com.apple.product-type.application";
 		};
+		A10006000000000000000002 /* StenoteTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A10008000000000000000004 /* Build configuration list for PBXNativeTarget "StenoteTests" */;
+			buildPhases = (
+				A10007000000000000000003 /* Sources */,
+				A10004000000000000000002 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A1000C000000000000000001 /* PBXTargetDependency */,
+			);
+			name = StenoteTests;
+			productName = StenoteTests;
+			productReference = A10003000000000000000002 /* StenoteTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -187,6 +230,10 @@
 				TargetAttributes = {
 					A10006000000000000000001 = {
 						CreatedOnToolsVersion = 16.0;
+					};
+					A10006000000000000000002 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = A10006000000000000000001;
 					};
 				};
 			};
@@ -207,6 +254,7 @@
 			projectRoot = "";
 			targets = (
 				A10006000000000000000001 /* Stenote */,
+				A10006000000000000000002 /* StenoteTests */,
 			);
 		};
 /* End PBXProject section */
@@ -250,6 +298,17 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A10007000000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10001000000000000000200 /* StreamingWindowTests.swift in Sources */,
+				A10001000000000000000201 /* StutterRemovalTests.swift in Sources */,
+				A10001000000000000000202 /* EncryptionServiceTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
 
 
 /* Begin XCBuildConfiguration section */
@@ -415,6 +474,42 @@
 			};
 			name = Release;
 		};
+		A10008000000000000000030 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 27;
+				DEVELOPMENT_TEAM = 5A4T37N77V;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.2;
+				MARKETING_VERSION = 0.8.7;
+				PRODUCT_BUNDLE_IDENTIFIER = com.youngpilot.StenoteTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Stenote.app/Contents/MacOS/Stenote";
+			};
+			name = Debug;
+		};
+		A10008000000000000000031 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 27;
+				DEVELOPMENT_TEAM = 5A4T37N77V;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.2;
+				MARKETING_VERSION = 0.8.7;
+				PRODUCT_BUNDLE_IDENTIFIER = com.youngpilot.StenoteTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Stenote.app/Contents/MacOS/Stenote";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -436,7 +531,34 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		A10008000000000000000004 /* Build configuration list for PBXNativeTarget "StenoteTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A10008000000000000000030 /* Debug */,
+				A10008000000000000000031 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
+
+/* Begin PBXContainerItemProxy section */
+		A1000D000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A10009000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A10006000000000000000001;
+			remoteInfo = Stenote;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXTargetDependency section */
+		A1000C000000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A10006000000000000000001 /* Stenote */;
+			targetProxy = A1000D000000000000000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCRemoteSwiftPackageReference section */
 		A1000A000000000000000001 /* XCRemoteSwiftPackageReference "FluidAudio" */ = {
@@ -460,4 +582,3 @@
 	};
 	rootObject = A10009000000000000000001 /* Project object */;
 }
-/* End PBXSourcesBuildPhase section */

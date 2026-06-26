@@ -314,22 +314,17 @@ final class TranscriptionService {
         // We CLAMP leftContext so the assembled window can never exceed the cap, no
         // matter how the other knobs are tuned later. This makes the failure mode
         // structurally impossible rather than relying on hand-picked numbers.
-        // Clamp BOTH chunk and left context at runtime so the assembled window
-        // (left + chunk + right) can NEVER exceed the cap, regardless of how these
-        // desired values are tuned later — release-safe, not a debug-only assert.
-        let encoderWindowCapSeconds = 14.5   // 15s hard cap, minus a 0.5s safety margin
-        let rightContextSeconds = 1.5
-        let chunkSeconds = min(11.0, encoderWindowCapSeconds - rightContextSeconds)
-        let maxLeftContextSeconds = max(0, encoderWindowCapSeconds - chunkSeconds - rightContextSeconds)
-        let leftContextSeconds = min(2.0, maxLeftContextSeconds)   // desired 2.0s, clamped to fit
+        // The clamp lives in `StreamingWindow.clamped` (pure + static) so the
+        // invariant (window <= cap) is unit-tested, not a debug-only assert.
+        let window = StreamingWindow.clamped()
 
         let config = StreamingAsrConfig(
-            chunkSeconds: chunkSeconds,              // good tradeoff for the TDT model
-            hypothesisChunkSeconds: 0.5,             // faster preview updates
-            leftContextSeconds: leftContextSeconds,  // clamped so window <= encoder cap
-            rightContextSeconds: rightContextSeconds,
-            minContextForConfirmation: 5.0,          // confirm text ~5s after speech
-            confirmationThreshold: 0.85              // stricter to compensate for less left context
+            chunkSeconds: window.chunkSeconds,             // good tradeoff for the TDT model
+            hypothesisChunkSeconds: 0.5,                   // faster preview updates
+            leftContextSeconds: window.leftContextSeconds, // clamped so window <= encoder cap
+            rightContextSeconds: window.rightContextSeconds,
+            minContextForConfirmation: 5.0,                // confirm text ~5s after speech
+            confirmationThreshold: 0.85                    // stricter to compensate for less left context
         )
         let asr = StreamingAsrManager(config: config)
 
@@ -391,7 +386,7 @@ final class TranscriptionService {
                 let trimmed = finalText.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !trimmed.isEmpty {
                     var corrected = postProcess(trimmed)
-                    corrected = removeTrailingStutter(corrected)
+                    corrected = Self.removeTrailingStutter(corrected)
 
                     let recognizer = NLLanguageRecognizer()
                     recognizer.processString(corrected)
@@ -429,9 +424,39 @@ final class TranscriptionService {
         voiceCommands.process(textReplacement.applyReplacements(to: text))
     }
 
+    /// Streaming-window geometry, clamped so the assembled window
+    /// (left + chunk + right) can NEVER exceed the encoder's fixed input cap
+    /// (15s / 240,000 samples). Exceeding it makes FluidAudio silently drop the
+    /// chunk — the root cause of the v0.8.6 "middle of long recordings vanished"
+    /// bug. Pure + static so the `window <= cap` invariant is unit-tested.
+    struct StreamingWindow: Equatable {
+        let chunkSeconds: Double
+        let leftContextSeconds: Double
+        let rightContextSeconds: Double
+        let capSeconds: Double
+
+        /// The full window assembled and fed to the encoder per step.
+        var windowSeconds: Double { leftContextSeconds + chunkSeconds + rightContextSeconds }
+
+        /// Clamp the desired knobs so `windowSeconds <= cap` always holds.
+        static func clamped(desiredChunk: Double = 11.0,
+                            desiredLeftContext: Double = 2.0,
+                            rightContext: Double = 1.5,
+                            cap: Double = 14.5) -> StreamingWindow {
+            let chunk = min(desiredChunk, max(0, cap - rightContext))
+            let maxLeft = max(0, cap - chunk - rightContext)
+            let left = min(desiredLeftContext, maxLeft)
+            return StreamingWindow(chunkSeconds: chunk,
+                                   leftContextSeconds: left,
+                                   rightContextSeconds: rightContext,
+                                   capSeconds: cap)
+        }
+    }
+
     /// Detect and remove ASR stutter where the last 1-2 words are repeated.
     /// e.g. "hello world world" → "hello world"
-    private func removeTrailingStutter(_ text: String) -> String {
+    /// Pure (input → output); `static` so the pipeline behavior is unit-testable.
+    static func removeTrailingStutter(_ text: String) -> String {
         let words = text.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
 
         func normalize(_ word: String) -> String {
