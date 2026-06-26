@@ -28,6 +28,9 @@ final class RecordingManager {
     private(set) var needsMicrophone = false
     private(set) var isTranscribingFile = false
     private(set) var fileTranscriptionName: String?
+    /// A file transcription finished and is waiting to be seen — drives the green
+    /// menubar badge. Cleared when the popover opens (or a new activity starts).
+    private(set) var fileTranscriptionDone = false
     private(set) var statusMessage: StatusMessage?
     private var statusClearTask: Task<Void, Never>?
     private var recordingStartTime: Date?
@@ -124,6 +127,7 @@ final class RecordingManager {
         // Instant acknowledgement the moment the shortcut registers — yellow icon
         // + start sound — BEFORE the audio engine spins up (~200ms HAL setup).
         stopAfterStart = false
+        fileTranscriptionDone = false   // a new recording supersedes a stale "ready" badge
         isStarting = true
         needsMicrophone = false
         SoundFeedback.playStart()
@@ -264,6 +268,7 @@ final class RecordingManager {
         guard !isRecording, !isStarting, !isTranscribingFile,
               transcriptionService.isModelLoaded else { return }
         statusMessage = nil
+        fileTranscriptionDone = false
         isTranscribingFile = true
         fileTranscriptionName = url.lastPathComponent
         Task { @MainActor in
@@ -279,6 +284,7 @@ final class RecordingManager {
                 historyService.addEntry(text)
                 SoundFeedback.playStop()
                 showStatus("Saved to history · copied")
+                fileTranscriptionDone = true   // green menubar badge until the popover is opened
             } catch {
                 showStatus(error.localizedDescription, isError: true)
                 logger.error("File transcription failed: \(error.localizedDescription)")
@@ -293,6 +299,12 @@ final class RecordingManager {
             return
         }
         transcribeFile(url)
+    }
+
+    /// Called when the popover opens — clears the green "transcription ready"
+    /// menubar badge (the user has come to look).
+    func markWindowOpened() {
+        fileTranscriptionDone = false
     }
 
     /// Show a transient one-line status (auto-dismissed). Errors linger a little

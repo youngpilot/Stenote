@@ -34,53 +34,56 @@ struct StenoteApp: App {
         return image
     }()
 
-    static let micRecordingIcon: NSImage = {
-        let size = NSSize(width: 18, height: 18)
-        let image = NSImage(size: size, flipped: false) { rect in
+    /// A non-template mic icon whose capsule (top) uses `top`; the stand adapts to
+    /// the menu bar's light/dark appearance.
+    private static func coloredMicIcon(top: String) -> NSImage {
+        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
             let isDark = NSAppearance.currentDrawing().bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            let standColor = isDark ? "white" : "black"
-            if let svgImage = makeSVGImage(topColor: "#E04848", bottomColor: standColor) {
-                svgImage.draw(in: rect)
+            if let svg = makeSVGImage(topColor: top, bottomColor: isDark ? "white" : "black") {
+                svg.draw(in: rect)
             }
             return true
         }
         image.isTemplate = false
         return image
-    }()
+    }
+
+    /// Recording — red.
+    static let micRecordingIcon: NSImage = coloredMicIcon(top: "#E04848")
 
     /// Shown for the brief moment between pressing the shortcut and the audio
     /// engine being live — amber "got it, starting".
-    static let micStartingIcon: NSImage = {
-        let size = NSSize(width: 18, height: 18)
-        let image = NSImage(size: size, flipped: false) { rect in
-            let isDark = NSAppearance.currentDrawing().bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            let standColor = isDark ? "white" : "black"
-            if let svgImage = makeSVGImage(topColor: "#E0A21E", bottomColor: standColor) {
-                svgImage.draw(in: rect)
-            }
-            return true
-        }
-        image.isTemplate = false
-        return image
-    }()
+    static let micStartingIcon: NSImage = coloredMicIcon(top: "#E0A21E")
+
+    /// Transcribing an audio file — a calm blue.
+    static let micTranscribingIcon: NSImage = coloredMicIcon(top: "#3B82F6")
+
+    /// A file transcription just finished and is waiting to be seen — a calm green.
+    static let micDoneIcon: NSImage = coloredMicIcon(top: "#34C759")
 }
 
-/// The menubar status item. While recording, the red mic gently breathes
-/// (opacity) so "it's listening" reads at a glance — a menubar app's only
-/// always-visible surface. The pulse loop only runs while recording (no idle
-/// timer), and it's a status item, not a Liquid-Glass tap target.
+/// The menubar status item. Its color reflects state: red while recording, amber
+/// starting, blue while transcribing a file, green when a file transcription is
+/// ready to be seen, otherwise the default mic. Active states (recording,
+/// transcribing) gently breathe so the work reads at a glance. It's a status
+/// item, not a Liquid-Glass tap target.
 private struct MenuBarLabel: View {
     @State private var recordingManager = RecordingManager.shared
     @State private var dimmed = false
 
+    /// Active states that pulse the icon (recording = red, transcribing = blue).
+    private var isPulsing: Bool {
+        recordingManager.isRecording || recordingManager.isTranscribingFile
+    }
+
     var body: some View {
         Image(nsImage: icon)
-            .opacity(recordingManager.isRecording && dimmed ? 0.55 : 1.0)
+            .opacity(isPulsing && dimmed ? 0.55 : 1.0)
             .animation(.easeInOut(duration: 0.6), value: dimmed)
-            .task(id: recordingManager.isRecording) {
+            .task(id: isPulsing) {
                 dimmed = false
-                guard recordingManager.isRecording else { return }
-                while !Task.isCancelled && recordingManager.isRecording {
+                guard isPulsing else { return }
+                while !Task.isCancelled && isPulsing {
                     dimmed.toggle()
                     try? await Task.sleep(for: .milliseconds(600))
                 }
@@ -89,8 +92,10 @@ private struct MenuBarLabel: View {
     }
 
     private var icon: NSImage {
-        recordingManager.isStarting
-            ? StenoteApp.micStartingIcon
-            : (recordingManager.isRecording ? StenoteApp.micRecordingIcon : StenoteApp.micIdleIcon)
+        if recordingManager.isStarting { return StenoteApp.micStartingIcon }
+        if recordingManager.isRecording { return StenoteApp.micRecordingIcon }
+        if recordingManager.isTranscribingFile { return StenoteApp.micTranscribingIcon }
+        if recordingManager.fileTranscriptionDone { return StenoteApp.micDoneIcon }
+        return StenoteApp.micIdleIcon
     }
 }

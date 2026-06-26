@@ -2,6 +2,11 @@
 
 All notable changes to Stenote. Dates are release dates; versions follow the app's `MARKETING_VERSION`.
 
+## 1.0.1
+
+### Added
+- **Menubar icon reflects file transcription** — the mic glyph turns a calm **blue** while transcribing an audio file, then a calm **green** when the result is ready, clearing back to default the next time you open the popover.
+
 ## 1.0.0
 
 The 1.0 release — still 100% on-device and private, now with file transcription, encrypted history, a clearer level meter, and dictation stats.

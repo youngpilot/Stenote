@@ -7,6 +7,7 @@ private let logger = Logger(subsystem: "com.youngpilot.Stenote", category: "AppD
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var rightClickMonitor: Any?
     private var windowObserver: Any?
+    private var popoverKeyObserver: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Under XCTest the app is only a test host — skip the heavy bootstrap
@@ -15,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         logger.info("Stenote launching...")
         installRightClickMonitor()
         configureMenuBarPanel()
+        observePopoverOpen()
 
         Task { @MainActor in
             // First launch: show onboarding (it handles the permission prompts).
@@ -47,6 +49,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             panel.acceptsMouseMovedEvents = true
             panel.isMovableByWindowBackground = false
             self?.windowObserver = nil
+        }
+    }
+
+    /// Clear the green "transcription ready" menubar badge whenever the popover
+    /// opens (the user has come to look). Persistent — fires on every open.
+    private func observePopoverOpen() {
+        popoverKeyObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didBecomeKeyNotification,
+            object: nil,
+            queue: .main
+        ) { notification in
+            guard let win = notification.object as? NSWindow,
+                  win.className.contains("StatusBar") || win.level == .popUpMenu || win.level == .floating
+            else { return }
+            Task { @MainActor in RecordingManager.shared.markWindowOpened() }
         }
     }
 
