@@ -373,7 +373,9 @@ struct MenuBarView: View {
                 if !recordingManager.isRecording, !recordingManager.isModelLoading {
                     let h = recordingManager.historyService
                     if h.totalRecordings > 0 {
-                        Text("\(formatDuration(h.totalDuration)) · \(formatCharCount(h.totalCharacters)) chars")
+                        let avgWpm = h.averageWPM
+                        Text("\(formatDuration(h.totalDuration)) · \(formatCharCount(h.totalCharacters)) chars"
+                             + (avgWpm > 0 ? " · ~\(Int(avgWpm.rounded())) wpm avg" : ""))
                             .font(.caption)
                             .foregroundStyle(.quaternary)
                     }

@@ -10,17 +10,38 @@ struct HistoryEntry: Codable, Identifiable {
     let text: String
     let duration: TimeInterval?
     let recordingId: Int?
+    let wordCount: Int?   // nil for legacy entries (backfilled from text on read)
 
-    init(text: String, duration: TimeInterval? = nil, recordingId: Int? = nil) {
+    init(text: String, duration: TimeInterval? = nil, recordingId: Int? = nil, wordCount: Int? = nil) {
         self.id = UUID()
         self.timestamp = Date()
         self.text = text
         self.duration = duration
         self.recordingId = recordingId
+        self.wordCount = wordCount
     }
 
     var formattedId: String {
         String(format: "%05d", recordingId ?? 0)
+    }
+
+    /// Words-per-minute for this entry, or nil if it isn't a valid dictation sample.
+    /// File imports have no duration; very short, tiny, or implausible samples are
+    /// excluded so they can't distort the average.
+    var wpm: Double? {
+        guard let duration, duration >= 3.0 else { return nil }
+        let words = wordCount ?? text.stenoteWordCount
+        guard words >= 5 else { return nil }
+        let value = Double(words) / (duration / 60.0)
+        return (value > 0 && value <= 400) ? value : nil
+    }
+}
+
+extension String {
+    /// Word count by Unicode whitespace, empty tokens dropped. Note: under-counts
+    /// non-space-delimited scripts (CJK/Thai) — acceptable for a dictation-pace stat.
+    var stenoteWordCount: Int {
+        split(whereSeparator: { $0.isWhitespace || $0.isNewline }).count
     }
 }
 
@@ -49,7 +70,8 @@ final class HistoryService {
         guard !trimmed.isEmpty else { return }
 
         totalRecordings += 1
-        let entry = HistoryEntry(text: trimmed, duration: duration, recordingId: totalRecordings)
+        let entry = HistoryEntry(text: trimmed, duration: duration, recordingId: totalRecordings,
+                                 wordCount: trimmed.stenoteWordCount)
         entries.insert(entry, at: 0)
 
         if let cap = SettingsStore.shared.historyLength.cap, entries.count > cap {
@@ -75,6 +97,15 @@ final class HistoryService {
     func clearHistory() {
         entries = []
         saveToDefaults()
+    }
+
+    /// Mean words-per-minute over eligible mic recordings, computed on the fly
+    /// (0 when none qualify). On-the-fly so it auto-corrects on delete/clear and
+    /// picks up legacy entries backfilled from their text.
+    var averageWPM: Double {
+        let samples = entries.compactMap(\.wpm)
+        guard !samples.isEmpty else { return 0 }
+        return samples.reduce(0, +) / Double(samples.count)
     }
 
     /// Trim stored entries to the current history-length setting. Call when the
