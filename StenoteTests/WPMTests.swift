@@ -40,6 +40,11 @@ final class WPMTests: XCTestCase {
         XCTAssertNil(entry("x", duration: 10, wordCount: 500).wpm)
     }
 
+    func testImplausiblySlowExcluded() {
+        // 5 words over 600s = 0.5 wpm (mic left on through silence) → excluded.
+        XCTAssertNil(entry("one two three four five", duration: 600, wordCount: 5).wpm)
+    }
+
     func testLegacyEntryBackfillsWordCountFromText() {
         let words = Array(repeating: "word", count: 20).joined(separator: " ")
         XCTAssertEqual(entry(words, duration: 20, wordCount: nil).wpm!, 60, accuracy: 0.001)

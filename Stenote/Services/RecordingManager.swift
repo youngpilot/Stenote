@@ -152,7 +152,9 @@ final class RecordingManager {
                 },
                 onLevel: { [weak self] level in
                     Task { @MainActor in
-                        guard let self else { return }
+                        // Ignore callbacks enqueued before stop so a late one can't
+                        // overwrite the inputLevel reset.
+                        guard let self, self.isRecording else { return }
                         // Asymmetric ballistics: fast attack, slow release — peaks
                         // pop instantly, then decay gracefully (level-meter feel).
                         let alpha: Float = level > self.inputLevel ? 0.6 : 0.2

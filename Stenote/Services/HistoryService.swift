@@ -26,14 +26,15 @@ struct HistoryEntry: Codable, Identifiable {
     }
 
     /// Words-per-minute for this entry, or nil if it isn't a valid dictation sample.
-    /// File imports have no duration; very short, tiny, or implausible samples are
-    /// excluded so they can't distort the average.
+    /// File imports have no duration; very short, tiny, or implausibly slow/fast
+    /// samples (e.g. a few words over minutes of silence) are excluded so they
+    /// can't distort the average.
     var wpm: Double? {
         guard let duration, duration >= 3.0 else { return nil }
         let words = wordCount ?? text.stenoteWordCount
         guard words >= 5 else { return nil }
         let value = Double(words) / (duration / 60.0)
-        return (value > 0 && value <= 400) ? value : nil
+        return (value >= 10 && value <= 400) ? value : nil
     }
 }
 
