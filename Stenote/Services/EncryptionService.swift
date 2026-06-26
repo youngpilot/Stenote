@@ -56,6 +56,14 @@ final class EncryptionService {
         }
     }
 
+    /// Create + cache the key ahead of first use, so any one-time Keychain
+    /// interaction happens during onboarding/setup rather than unexpectedly on a
+    /// later recording. Returns false only if the key is unavailable (e.g. denied).
+    @discardableResult
+    func warm() -> Bool {
+        key() != nil
+    }
+
     // MARK: - Key (Keychain)
 
     private func key() -> SymmetricKey? {

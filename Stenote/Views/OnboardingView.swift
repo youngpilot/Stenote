@@ -50,6 +50,7 @@ struct OnboardingView: View {
     @State private var micGranted = false
     @State private var axGranted = false
     @State private var requestedMediaAuth = false
+    @State private var warmedEncryption = false
 
     private let lastStep = 4
 
@@ -159,7 +160,18 @@ struct OnboardingView: View {
             Label("Spotify & Apple Music control is requested later, only the first time you record with pausing on.", systemImage: "info.circle")
                 .font(.caption).foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
+            Label("Your transcription history is encrypted on this Mac. The key is kept in your Keychain and never leaves the device — if macOS asks, choose Allow.", systemImage: "lock.fill")
+                .font(.caption).foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
             Spacer()
+        }
+        .onAppear {
+            // Create the history-encryption key now, during setup, so any one-time
+            // Keychain prompt happens here (explained above) — not later mid-use.
+            if !warmedEncryption {
+                warmedEncryption = true
+                EncryptionService.shared.warm()
+            }
         }
     }
 
