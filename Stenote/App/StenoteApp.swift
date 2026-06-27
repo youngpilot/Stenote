@@ -48,81 +48,9 @@ struct StenoteApp: App {
         return image
     }
 
-    // --- Recording: a steady macOS-orange mic with a deep-red level rising inside
-    // the mic head — a tiny live waveform. The orange base never fluctuates; only
-    // the red level (and its gentle wavy top) tracks your voice. ---
-    private static let recordingOrange = "#FF9500"   // macOS systemOrange
-
-    /// Just the mic-head (capsule) shape — used to clip the red level to the head.
-    private static let capsuleOnlySVG = """
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"><path fill="#000000" d="M12 2a5.75 5.75 0 0 0-5.75 5.75v3a5.75 5.75 0 0 0 11.452.75H13a.75.75 0 0 1 0-1.5h4.75V8.5H13A.75.75 0 0 1 13 7h4.701A5.75 5.75 0 0 0 12 2"/></svg>
-    """
-
-    private static let orangeMicImage: NSImage =
-        makeSVGImage(topColor: recordingOrange, bottomColor: recordingOrange) ?? micIdleIcon
-
-    private static let capsuleMaskImage: NSImage = {
-        guard let data = capsuleOnlySVG.data(using: .utf8), let img = NSImage(data: data) else { return NSImage() }
-        img.size = NSSize(width: 18, height: 18)
-        return img
-    }()
-
-    @MainActor private static var recordingIconCache: [Int: NSImage] = [:]
-
-    /// Recording icon: steady orange mic, deep-red level filling the mic head from
-    /// below as you get louder, with a gentle wavy top so it reads as a tiny live
-    /// waveform. Quantized into level buckets and cached for efficiency.
-    @MainActor static func recordingIcon(level: Float) -> NSImage {
-        let steps = 24
-        let clamped = min(max(level, 0), 1)
-        let bucket = Int((clamped * Float(steps - 1)).rounded())
-        if let cached = recordingIconCache[bucket] { return cached }
-
-        let size = NSSize(width: 18, height: 18)
-        let bounds = NSRect(origin: .zero, size: size)
-
-        // Fill height inside the mic head (points, origin bottom-left), kept within
-        // the capsule's vertical band so there's always a little red at the bottom
-        // and it never overflows the head.
-        let frac = 0.15 + Double(bucket) / Double(steps - 1) * 0.80   // 15%..95%
-        let fillTop = 8.0 + CGFloat(frac) * 7.5                       // ~8.0 .. 15.5
-        let phase = Double(bucket) * 0.7                             // subtle flow as level moves
-
-        // 1) Deep-red wavy fill across the full width.
-        let redWave = NSImage(size: size)
-        redWave.lockFocus()
-        let wave = NSBezierPath()
-        wave.move(to: NSPoint(x: 0, y: 0))
-        var x: CGFloat = 0
-        while x <= 18 {
-            let y = fillTop + 0.9 * CGFloat(sin(Double(x) / 18.0 * 4 * .pi + phase))  // ~2 humps
-            wave.line(to: NSPoint(x: x, y: y))
-            x += 1
-        }
-        wave.line(to: NSPoint(x: 18, y: 0))
-        wave.close()
-        NSColor(srgbRed: 0.784, green: 0.118, blue: 0.118, alpha: 1).setFill()       // deep red
-        wave.fill()
-        redWave.unlockFocus()
-
-        // 2) Keep the red only inside the mic head.
-        let redInHead = NSImage(size: size)
-        redInHead.lockFocus()
-        capsuleMaskImage.draw(in: bounds)
-        redWave.draw(in: bounds, from: .zero, operation: .sourceIn, fraction: 1)
-        redInHead.unlockFocus()
-
-        // 3) Steady orange mic + the red level on top.
-        let icon = NSImage(size: size)
-        icon.lockFocus()
-        orangeMicImage.draw(in: bounds)
-        redInHead.draw(in: bounds, from: .zero, operation: .sourceOver, fraction: 1)
-        icon.unlockFocus()
-        icon.isTemplate = false
-
-        recordingIconCache[bucket] = icon
-        return icon
-    }
+    /// Recording — a clean, deep-red mic head with the stand adapting to light/dark.
+    /// Static (no animation, no level fill); shown the moment recording starts.
+    static let micRecordingIcon: NSImage = coloredMicIcon(top: "#E04848")
 
     /// Transcribing an audio file — a calm blue.
     static let micTranscribingIcon: NSImage = coloredMicIcon(top: "#3B82F6")
@@ -131,11 +59,10 @@ struct StenoteApp: App {
     static let micDoneIcon: NSImage = coloredMicIcon(top: "#34C759")
 }
 
-/// The menubar status item reflects state: a steady orange mic while recording,
-/// with a deep-red level rising inside the head as you speak (a tiny live
-/// waveform); blue while transcribing a file; green when a transcription is ready;
-/// otherwise the default mic. The blue transcribing state gently breathes (no mic
-/// signal to drive it). It's a status item, not a Liquid-Glass tap target.
+/// The menubar status item reflects state: a deep-red mic while recording; blue
+/// while transcribing a file; green when a transcription is ready; otherwise the
+/// default mic. The blue transcribing state gently breathes (no mic signal to
+/// drive it). It's a status item, not a Liquid-Glass tap target.
 private struct MenuBarLabel: View {
     @State private var recordingManager = RecordingManager.shared
     @State private var dimmed = false
@@ -162,10 +89,8 @@ private struct MenuBarLabel: View {
     }
 
     private var icon: NSImage {
-        // No separate "starting" state — go straight to the recording visualization.
-        if recordingManager.isRecording || recordingManager.isStarting {
-            return StenoteApp.recordingIcon(level: recordingManager.inputLevel)
-        }
+        // No separate "starting" state — show the red recording mic immediately.
+        if recordingManager.isRecording || recordingManager.isStarting { return StenoteApp.micRecordingIcon }
         if recordingManager.isTranscribingFile { return StenoteApp.micTranscribingIcon }
         if recordingManager.fileTranscriptionDone { return StenoteApp.micDoneIcon }
         return StenoteApp.micIdleIcon
