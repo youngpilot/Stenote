@@ -198,6 +198,14 @@ final class SettingsStore {
         didSet { UserDefaults.standard.set(enableVocabBoosting, forKey: "enableVocabBoosting") }
     }
 
+    /// Clean up dictated text on-device after recording (punctuation,
+    /// capitalization, filler-word removal). Opt-in. Uses Apple Foundation Models
+    /// when available, else a deterministic rule-based fallback. Text never leaves
+    /// the Mac.
+    var cleanupText: Bool {
+        didSet { UserDefaults.standard.set(cleanupText, forKey: "cleanupText") }
+    }
+
     var insertionMode: InsertionMode {
         didSet { UserDefaults.standard.set(insertionMode.rawValue, forKey: "insertionMode") }
     }
@@ -252,6 +260,7 @@ final class SettingsStore {
         silenceMediaWhileRecording = true
         pauseMediaApps = true
         enableVocabBoosting = false
+        cleanupText = false
         insertionMode = .auto
         enableVoiceCommands = false
         enabledVoiceCommandIDs = Set(VoiceCommandID.allCases.map(\.rawValue))
@@ -291,6 +300,7 @@ final class SettingsStore {
         }
         self.pauseMediaApps = ud.object(forKey: "pauseMediaApps") == nil ? true : ud.bool(forKey: "pauseMediaApps")
         self.enableVocabBoosting = ud.object(forKey: "enableVocabBoosting") == nil ? false : ud.bool(forKey: "enableVocabBoosting")
+        self.cleanupText = ud.bool(forKey: "cleanupText")
         self.insertionMode = InsertionMode(rawValue: ud.string(forKey: "insertionMode") ?? "") ?? .auto
         self.enableVoiceCommands = ud.bool(forKey: "enableVoiceCommands")
         self.enabledVoiceCommandIDs = (ud.array(forKey: "enabledVoiceCommandIDs") as? [String]).map(Set.init)

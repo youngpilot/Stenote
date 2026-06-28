@@ -22,6 +22,7 @@
 		A10001000000000000000015 /* UncheckedSendableBox.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000015 /* UncheckedSendableBox.swift */; };
 		A10001000000000000000016 /* HistoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000016 /* HistoryService.swift */; };
 		A10001000000000000000020 /* EncryptionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000020 /* EncryptionService.swift */; };
+		A10001000000000000000021 /* TextCleanupService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000021 /* TextCleanupService.swift */; };
 		A10001000000000000000017 /* SystemAudioService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000017 /* SystemAudioService.swift */; };
 		A10001000000000000000099 /* UpdateService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000099 /* UpdateService.swift */; };
 		A10001000000000000000098 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000098 /* OnboardingView.swift */; };
@@ -33,6 +34,7 @@
 		A10001000000000000000202 /* EncryptionServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000202 /* EncryptionServiceTests.swift */; };
 		A10001000000000000000203 /* WPMTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000203 /* WPMTests.swift */; };
 		A10001000000000000000204 /* StatFormatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000204 /* StatFormatTests.swift */; };
+		A10001000000000000000205 /* TextCleanupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000205 /* TextCleanupTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -51,6 +53,7 @@
 		A10002000000000000000015 /* UncheckedSendableBox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UncheckedSendableBox.swift; sourceTree = "<group>"; };
 		A10002000000000000000016 /* HistoryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryService.swift; sourceTree = "<group>"; };
 		A10002000000000000000020 /* EncryptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EncryptionService.swift; sourceTree = "<group>"; };
+		A10002000000000000000021 /* TextCleanupService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextCleanupService.swift; sourceTree = "<group>"; };
 		A10002000000000000000017 /* SystemAudioService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAudioService.swift; sourceTree = "<group>"; };
 		A10002000000000000000099 /* UpdateService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateService.swift; sourceTree = "<group>"; };
 		A10002000000000000000098 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
@@ -65,6 +68,7 @@
 		A10002000000000000000202 /* EncryptionServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EncryptionServiceTests.swift; sourceTree = "<group>"; };
 		A10002000000000000000203 /* WPMTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WPMTests.swift; sourceTree = "<group>"; };
 		A10002000000000000000204 /* StatFormatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatFormatTests.swift; sourceTree = "<group>"; };
+		A10002000000000000000205 /* TextCleanupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextCleanupTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -111,6 +115,7 @@
 				A10002000000000000000202 /* EncryptionServiceTests.swift */,
 				A10002000000000000000203 /* WPMTests.swift */,
 				A10002000000000000000204 /* StatFormatTests.swift */,
+				A10002000000000000000205 /* TextCleanupTests.swift */,
 			);
 			path = StenoteTests;
 			sourceTree = "<group>";
@@ -158,6 +163,7 @@
 				A10002000000000000000014 /* TextReplacementService.swift */,
 				A10002000000000000000016 /* HistoryService.swift */,
 				A10002000000000000000020 /* EncryptionService.swift */,
+				A10002000000000000000021 /* TextCleanupService.swift */,
 				A10002000000000000000017 /* SystemAudioService.swift */,
 				A10002000000000000000099 /* UpdateService.swift */,
 				A5178128DCCD441D8396BC03 /* VoiceCommandService.swift */,
@@ -295,6 +301,7 @@
 				A10001000000000000000015 /* UncheckedSendableBox.swift in Sources */,
 				A10001000000000000000016 /* HistoryService.swift in Sources */,
 				A10001000000000000000020 /* EncryptionService.swift in Sources */,
+				A10001000000000000000021 /* TextCleanupService.swift in Sources */,
 				A10001000000000000000017 /* SystemAudioService.swift in Sources */,
 				A10001000000000000000099 /* UpdateService.swift in Sources */,
 				A10001000000000000000098 /* OnboardingView.swift in Sources */,
@@ -313,6 +320,7 @@
 				A10001000000000000000202 /* EncryptionServiceTests.swift in Sources */,
 				A10001000000000000000203 /* WPMTests.swift in Sources */,
 				A10001000000000000000204 /* StatFormatTests.swift in Sources */,
+				A10001000000000000000205 /* TextCleanupTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -445,7 +453,7 @@
 				CODE_SIGN_ENTITLEMENTS = Stenote/Stenote.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 30;
+				CURRENT_PROJECT_VERSION = 31;
 				DEVELOPMENT_TEAM = 5A4T37N77V;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -453,7 +461,7 @@
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Steneo needs Automation access to detect if music is playing, so it can pause during recording and resume when you stop.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Steneo uses your microphone to transcribe speech into text locally on your device. Audio never leaves your Mac.";
-				MARKETING_VERSION = 1.0.1;
+				MARKETING_VERSION = 1.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.youngpilot.Stenote;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -468,7 +476,7 @@
 				CODE_SIGN_ENTITLEMENTS = Stenote/Stenote.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 30;
+				CURRENT_PROJECT_VERSION = 31;
 				DEVELOPMENT_TEAM = 5A4T37N77V;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -476,7 +484,7 @@
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Steneo needs Automation access to detect if music is playing, so it can pause during recording and resume when you stop.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Steneo uses your microphone to transcribe speech into text locally on your device. Audio never leaves your Mac.";
-				MARKETING_VERSION = 1.0.1;
+				MARKETING_VERSION = 1.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.youngpilot.Stenote;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -489,11 +497,11 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 30;
+				CURRENT_PROJECT_VERSION = 31;
 				DEVELOPMENT_TEAM = 5A4T37N77V;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.2;
-				MARKETING_VERSION = 1.0.1;
+				MARKETING_VERSION = 1.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.youngpilot.StenoteTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -507,11 +515,11 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 30;
+				CURRENT_PROJECT_VERSION = 31;
 				DEVELOPMENT_TEAM = 5A4T37N77V;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.2;
-				MARKETING_VERSION = 1.0.1;
+				MARKETING_VERSION = 1.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.youngpilot.StenoteTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;

@@ -254,7 +254,18 @@ final class RecordingManager {
         audioContinuation = nil
         await transcriptionService.awaitAudioConsumer()
 
-        let finalText = await transcriptionService.stopTranscription()
+        var finalText = await transcriptionService.stopTranscription()
+        // Capture duration BEFORE optional cleanup so WPM reflects speaking time,
+        // not the cleanup pass.
+        let duration = recordingStartTime.map { Date().timeIntervalSince($0) }
+
+        // Optional on-device AI cleanup (punctuation, capitalization, filler-word
+        // removal). Opt-in; runs locally, text never leaves the Mac; falls back to
+        // the original text on any failure.
+        if SettingsStore.shared.cleanupText, !finalText.isEmpty {
+            showStatus("Cleaning up…")
+            finalText = await TextCleanupService.shared.cleanup(finalText)
+        }
 
         // Paste the COMPLETE transcript (with prefix/suffix) once — reliable,
         // with no chunk-boundary artifacts from incremental pasting.
@@ -266,7 +277,6 @@ final class RecordingManager {
             if !suffix.isEmpty { output = output + " " + suffix }
 
             outputService.insertText(output)
-            let duration = recordingStartTime.map { Date().timeIntervalSince($0) }
             historyService.addEntry(output, duration: duration)
         }
 

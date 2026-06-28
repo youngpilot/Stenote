@@ -1442,6 +1442,27 @@ private struct InlineSettingsView: View {
                 }
             }
 
+            // AI Text Cleanup
+            SettingsCard(title: "Text Cleanup", isExpanded: expandedSection == "Text Cleanup", onToggle: { toggleSection("Text Cleanup") }) {
+                Text("Tidy up dictated text on-device after recording: fix punctuation & capitalization and drop filler words (um, äh). Runs on your Mac — nothing is sent anywhere.")
+                    .font(labelFont)
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Toggle("Clean up text after dictation", isOn: Binding(
+                    get: { settings.cleanupText },
+                    set: { settings.cleanupText = $0 }
+                ))
+                .font(labelFont)
+
+                if settings.cleanupText, !TextCleanupService.shared.usesAppleIntelligence {
+                    Text("Apple Intelligence isn't available on this Mac, so a built-in rule-based cleanup is used instead (lighter touch).")
+                        .font(labelFont)
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
             // Word Corrections
             SettingsCard(title: "Word Corrections", isExpanded: expandedSection == "Word Corrections", onToggle: { toggleSection("Word Corrections") }) {
                 Text("Wrong → Right corrections always work. Boost-only words (no \"Wrong\") need Model Boosting enabled.")
