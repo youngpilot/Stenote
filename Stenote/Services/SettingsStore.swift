@@ -198,12 +198,11 @@ final class SettingsStore {
         didSet { UserDefaults.standard.set(enableVocabBoosting, forKey: "enableVocabBoosting") }
     }
 
-    /// Clean up dictated text on-device after recording (punctuation,
-    /// capitalization, filler-word removal). Opt-in. Uses Apple Foundation Models
-    /// when available, else a deterministic rule-based fallback. Text never leaves
-    /// the Mac.
-    var cleanupText: Bool {
-        didSet { UserDefaults.standard.set(cleanupText, forKey: "cleanupText") }
+    /// How dictated text is cleaned up after recording: Off / Rules (deterministic
+    /// filler removal) / AI (on-device Foundation Models). Default Off. Text never
+    /// leaves the Mac in any mode.
+    var cleanupMode: CleanupMode {
+        didSet { UserDefaults.standard.set(cleanupMode.rawValue, forKey: "cleanupMode") }
     }
 
     var insertionMode: InsertionMode {
@@ -260,7 +259,7 @@ final class SettingsStore {
         silenceMediaWhileRecording = true
         pauseMediaApps = true
         enableVocabBoosting = false
-        cleanupText = false
+        cleanupMode = .off
         insertionMode = .auto
         enableVoiceCommands = false
         enabledVoiceCommandIDs = Set(VoiceCommandID.allCases.map(\.rawValue))
@@ -300,7 +299,12 @@ final class SettingsStore {
         }
         self.pauseMediaApps = ud.object(forKey: "pauseMediaApps") == nil ? true : ud.bool(forKey: "pauseMediaApps")
         self.enableVocabBoosting = ud.object(forKey: "enableVocabBoosting") == nil ? false : ud.bool(forKey: "enableVocabBoosting")
-        self.cleanupText = ud.bool(forKey: "cleanupText")
+        // Migrate the old boolean toggle: on → Rules (the safe default), off → Off.
+        if let raw = ud.string(forKey: "cleanupMode"), let mode = CleanupMode(rawValue: raw) {
+            self.cleanupMode = mode
+        } else {
+            self.cleanupMode = ud.bool(forKey: "cleanupText") ? .rules : .off
+        }
         self.insertionMode = InsertionMode(rawValue: ud.string(forKey: "insertionMode") ?? "") ?? .auto
         self.enableVoiceCommands = ud.bool(forKey: "enableVoiceCommands")
         self.enabledVoiceCommandIDs = (ud.array(forKey: "enabledVoiceCommandIDs") as? [String]).map(Set.init)

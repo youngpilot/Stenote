@@ -142,6 +142,9 @@ final class RecordingManager {
         needsMicrophone = false
         SoundFeedback.playStart()
 
+        // In AI mode, warm the on-device model now so cleanup is fast at stop.
+        if SettingsStore.shared.cleanupMode == .ai { TextCleanupService.shared.prewarm() }
+
         outputService.rememberSourceApp()
         transcriptionService.beginCapturing()   // hold audio until ASR is ready
         startTask = Task { @MainActor in await transcriptionService.startTranscription() }
@@ -262,10 +265,13 @@ final class RecordingManager {
         // not the cleanup pass.
         let duration = recordingStartTime.map { Date().timeIntervalSince($0) }
 
-        // Optional on-device filler-word removal (opt-in, rule-based → instant,
-        // never changes wording). Punctuation/caps come from the speech model.
-        if SettingsStore.shared.cleanupText, !finalText.isEmpty {
-            finalText = TextCleanupService.shared.cleanup(finalText)
+        // Optional on-device cleanup. Rules = instant filler removal (never changes
+        // wording); AI = on-device LLM (can rephrase). Off = skip. Punctuation/caps
+        // come from the speech model regardless.
+        let cleanupMode = SettingsStore.shared.cleanupMode
+        if cleanupMode != .off, !finalText.isEmpty {
+            if cleanupMode == .ai { showStatus("Cleaning up…") }
+            finalText = await TextCleanupService.shared.cleanup(finalText, mode: cleanupMode)
         }
 
         // Paste the COMPLETE transcript (with prefix/suffix) once — reliable,

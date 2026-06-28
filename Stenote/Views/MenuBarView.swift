@@ -42,14 +42,20 @@ struct MenuBarView: View {
         } isTargeted: { fileDropTargeted = $0 }
         .overlay {
             if fileDropTargeted {
+                // Warm yellow — the same tone the menubar mic uses while processing,
+                // so "drop here / recognized" and "transcribing" read as one cue.
+                let warmYellow = Color(red: 0.902, green: 0.635, blue: 0.235)
                 RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 2, dash: [6]))
-                    .background(Color.accentColor.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+                    .strokeBorder(warmYellow, style: StrokeStyle(lineWidth: 2, dash: [6]))
+                    .background(warmYellow.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
                     .overlay {
-                        Label("Drop audio to transcribe", systemImage: "waveform")
-                            .font(.body).fontWeight(.medium)
-                            .padding(.horizontal, 12).padding(.vertical, 8)
-                            .background(.regularMaterial, in: Capsule())
+                        Label {
+                            Text("Drop audio to transcribe").font(.body).fontWeight(.medium)
+                        } icon: {
+                            Image(systemName: "mic.fill").foregroundStyle(warmYellow)
+                        }
+                        .padding(.horizontal, 12).padding(.vertical, 8)
+                        .background(.regularMaterial, in: Capsule())
                     }
                     .allowsHitTesting(false)
                     .transition(.opacity)
@@ -1441,17 +1447,35 @@ private struct InlineSettingsView: View {
                     .textFieldStyle(.roundedBorder)
                 }
 
-                Toggle("Remove filler words", isOn: Binding(
-                    get: { settings.cleanupText },
-                    set: { settings.cleanupText = $0 }
-                ))
-                .font(labelFont)
+                settingsRow("Cleanup") {
+                    Picker("", selection: Binding(
+                        get: { settings.cleanupMode },
+                        set: { settings.cleanupMode = $0 }
+                    )) {
+                        ForEach(CleanupMode.allCases) { mode in
+                            Text(mode.label).tag(mode)
+                        }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                }
 
-                if settings.cleanupText {
-                    Text("Drops spoken fillers (um, uh, äh, ähm) after dictation — instant, on-device, and never changes your wording. Punctuation & capitalization are already handled by the speech model. Off = exactly what you said.")
+                if settings.cleanupMode == .rules {
+                    Text("Drops spoken fillers (um, äh) after dictation — instant, on-device, and never changes your wording. Punctuation & capitalization come from the speech model.")
                         .font(labelFont)
                         .foregroundStyle(.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
+                } else if settings.cleanupMode == .ai {
+                    Text("Apple's on-device model removes fillers and tidies light grammar. Stays on your Mac, but can occasionally rephrase — for verbatim or mixed-language dictation, prefer Rules.")
+                        .font(labelFont)
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if !TextCleanupService.shared.usesAppleIntelligence {
+                        Text("Apple Intelligence isn't available on this Mac, so AI falls back to Rules.")
+                            .font(labelFont)
+                            .foregroundStyle(.tertiary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
 

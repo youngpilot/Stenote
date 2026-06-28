@@ -52,17 +52,18 @@ struct StenoteApp: App {
     /// Static (no animation, no level fill); shown the moment recording starts.
     static let micRecordingIcon: NSImage = coloredMicIcon(top: "#E04848")
 
-    /// Transcribing an audio file — a calm blue.
-    static let micTranscribingIcon: NSImage = coloredMicIcon(top: "#3B82F6")
+    /// Transcribing an audio file — a warm yellow that matches the drag-over
+    /// highlight, so "processing" reads the same whether you dropped or are waiting.
+    static let micTranscribingIcon: NSImage = coloredMicIcon(top: "#E6A23C")
 
     /// A file transcription just finished and is waiting to be seen — a calm green.
     static let micDoneIcon: NSImage = coloredMicIcon(top: "#34C759")
 }
 
-/// The menubar status item reflects state: a deep-red mic while recording; blue
-/// while transcribing a file; green when a transcription is ready; otherwise the
-/// default mic. The blue transcribing state gently breathes (no mic signal to
-/// drive it). It's a status item, not a Liquid-Glass tap target.
+/// The menubar status item reflects state: a deep-red mic while recording; warm
+/// yellow while transcribing a file; green when a transcription is ready; otherwise
+/// the default mic. The yellow transcribing state gently breathes (no mic signal to
+/// drive it) to read as "processing". It's a status item, not a Liquid-Glass tap target.
 private struct MenuBarLabel: View {
     @State private var recordingManager = RecordingManager.shared
     @State private var dimmed = false
