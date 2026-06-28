@@ -34,11 +34,7 @@ final class TranscriptionService {
     // why short clips don't garble and the first words are never lost to ASR
     // warm-up: the model only runs at stop, on the complete audio.
     private var isCapturing = false                 // mic is live; buffer audio
-    private var recordedSamples: [Float] = []       // accumulated 16 kHz mono samples
     private var audioConsumer: Task<Void, Never>?   // lone, serial consumer of the audio stream
-    /// Cap the buffer so an extremely long recording can't grow RAM without bound.
-    /// 16 kHz mono Float = 64 KB/s → ~30 min ≈ 115 MB. Cap ~30 min.
-    private static let maxRecordedSamples = 16_000 * 60 * 30
 
     // --- VAD state (auto-stop) ---
     private var vadBuffer: [Float] = []
@@ -115,7 +111,6 @@ final class TranscriptionService {
     /// start and buffer instantly.
     func beginCapturing() {
         currentText = ""
-        recordedSamples = []
         vadBuffer = []
         vadStreamState = .initial()
         lastSpeechTime = Date()
@@ -157,11 +152,11 @@ final class TranscriptionService {
 
     /// Stop capture and transcribe the whole buffer in ONE batch pass (full
     /// context). Returns the final text.
-    func stopTranscription() async -> String {
+    func stopTranscription(rawSamples: [Float], rate: Double) async -> String {
         isCapturing = false
         guard isTranscribing else { return currentText }
         isTranscribing = false
-        await transcribeBuffered()
+        await transcribeRecording(rawSamples, rate: rate)
         return currentText
     }
 
@@ -181,9 +176,10 @@ final class TranscriptionService {
 
     /// Transcribe the buffered recording with the batch engine (full context),
     /// then apply the shared text pipeline. Sets `currentText`.
-    private func transcribeBuffered() async {
-        let samples = recordedSamples
-        recordedSamples = []
+    private func transcribeRecording(_ rawSamples: [Float], rate: Double) async {
+        // ONE clean conversion of the whole recording (input rate → 16 kHz), like
+        // the file path — no per-buffer resampler warm-up to garble short clips.
+        let samples = (rate <= 0 || rate == 16000) ? rawSamples : Self.resample(rawSamples, from: rate)
         guard samples.count >= 1600 else {   // < ~0.1 s of audio — nothing to do
             currentText = ""
             return
@@ -210,6 +206,34 @@ final class TranscriptionService {
         }
     }
 
+    /// Single-shot resample of a complete mono signal (input rate → `outRate`),
+    /// flushing held samples at end-of-stream. ONE filter warm-up for the whole
+    /// recording (negligible) instead of one per buffer — this is what keeps short
+    /// clips clean (per-buffer resampling garbled their warm-up-heavy start).
+    static func resample(_ samples: [Float], from inRate: Double, to outRate: Double = 16000) -> [Float] {
+        guard !samples.isEmpty, inRate > 0, inRate != outRate,
+              let inFmt = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: inRate, channels: 1, interleaved: false),
+              let outFmt = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: outRate, channels: 1, interleaved: false),
+              let conv = AVAudioConverter(from: inFmt, to: outFmt),
+              let inBuf = AVAudioPCMBuffer(pcmFormat: inFmt, frameCapacity: AVAudioFrameCount(samples.count))
+        else { return samples }
+        inBuf.frameLength = AVAudioFrameCount(samples.count)
+        samples.withUnsafeBufferPointer { inBuf.floatChannelData![0].update(from: $0.baseAddress!, count: samples.count) }
+
+        let outCap = AVAudioFrameCount((Double(samples.count) * outRate / inRate).rounded(.up)) + 4096
+        guard let outBuf = AVAudioPCMBuffer(pcmFormat: outFmt, frameCapacity: outCap) else { return samples }
+        var error: NSError?
+        var fed = false
+        conv.convert(to: outBuf, error: &error) { _, status in
+            if fed { status.pointee = .endOfStream; return nil }
+            fed = true
+            status.pointee = .haveData
+            return inBuf
+        }
+        guard error == nil, outBuf.frameLength > 0 else { return samples }
+        return Array(UnsafeBufferPointer(start: outBuf.floatChannelData![0], count: Int(outBuf.frameLength)))
+    }
+
     // MARK: - File transcription (batch)
 
     /// Transcribe an audio file (any length) with the batch ASR — full context,
@@ -231,15 +255,10 @@ final class TranscriptionService {
         guard let channelData = buffer.floatChannelData else { return }
         let count = Int(buffer.frameLength)
         guard count > 0 else { return }
+        // This is the per-buffer-converted 16 kHz audio — used ONLY to drive VAD
+        // auto-stop (which tolerates resampler artifacts). The ASR uses the raw
+        // recording, converted in ONE shot at stop (AudioCaptureService.takeRecording).
         let samples = Array(UnsafeBufferPointer(start: channelData[0], count: count))
-
-        // Accumulate raw audio for the single batch pass at stop.
-        recordedSamples.append(contentsOf: samples)
-        if recordedSamples.count > Self.maxRecordedSamples {
-            recordedSamples.removeFirst(recordedSamples.count - Self.maxRecordedSamples)
-        }
-
-        // Feed VAD for auto-stop.
         await processVadSamples(samples)
     }
 

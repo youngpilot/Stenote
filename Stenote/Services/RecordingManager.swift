@@ -258,7 +258,10 @@ final class RecordingManager {
         audioContinuation = nil
         await transcriptionService.awaitAudioConsumer()
 
-        var finalText = await transcriptionService.stopTranscription()
+        // ONE clean conversion of the whole raw recording (like the file path) —
+        // no per-buffer resampler warm-up that garbled short clips.
+        let recorded = audioCaptureService.takeRecording()
+        var finalText = await transcriptionService.stopTranscription(rawSamples: recorded.samples, rate: recorded.rate)
         // Capture duration BEFORE optional cleanup so WPM reflects speaking time,
         // not the cleanup pass.
         let duration = recordingStartTime.map { Date().timeIntervalSince($0) }

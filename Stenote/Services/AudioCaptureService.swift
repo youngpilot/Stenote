@@ -25,6 +25,13 @@ final class AudioCaptureService: @unchecked Sendable {
     private var tapFormat: AVAudioFormat?
     private var active = false
 
+    // Raw recorded audio (ch0, at the input sample rate) for ONE clean conversion
+    // at stop — per-buffer resampling warms its filter each clip and garbles short
+    // ones. All access serialized on engineQueue (no render-thread lock).
+    private var rawRecording: [Float] = []
+    private var rawRate: Double = 0
+    private static let maxRaw = 48_000 * 60 * 10   // ~10 min @ 48 kHz cap
+
     // Per-recording sinks; the tap forwards to them only while `active`.
     private var onBuffer: (@Sendable (AVAudioPCMBuffer) -> Void)?
     private var onLevel: (@Sendable (Float) -> Void)?
@@ -70,6 +77,8 @@ final class AudioCaptureService: @unchecked Sendable {
                 // here: the engine is stopped and the tap is inactive, so no
                 // render-thread callback can be touching the converter.
                 converter?.reset()
+                rawRecording = []
+                rawRate = 0
                 active = true
                 if !engine.isRunning {
                     engine.prepare()
@@ -88,6 +97,16 @@ final class AudioCaptureService: @unchecked Sendable {
         active = false   // stop forwarding immediately (handleTap guards on this)
         engineQueue.async { [self] in
             if engine.isRunning { engine.stop() }   // mic off; engine kept warm for next time
+        }
+    }
+
+    /// The raw recorded audio (ch0, at the input sample rate) + its rate, for one
+    /// clean single-shot conversion at stop. Clears the buffer.
+    func takeRecording() -> (samples: [Float], rate: Double) {
+        engineQueue.sync {
+            let result = (rawRecording, rawRate)
+            rawRecording = []
+            return result
         }
     }
 
@@ -165,6 +184,22 @@ final class AudioCaptureService: @unchecked Sendable {
             }
         }
         onBuffer?(converted)
+
+        // Accumulate the RAW input (ch0, at the input rate) for ONE clean
+        // conversion at stop. Copy on the render thread (like `converted`),
+        // append on engineQueue so all `rawRecording` access stays serialized.
+        let rawCount = Int(buffer.frameLength)
+        if let raw = buffer.floatChannelData, rawCount > 0 {
+            let chunk = Array(UnsafeBufferPointer(start: raw[0], count: rawCount))
+            let rate = inputFormat.sampleRate
+            engineQueue.async { [self] in
+                rawRecording.append(contentsOf: chunk)
+                rawRate = rate
+                if rawRecording.count > Self.maxRaw {
+                    rawRecording.removeFirst(rawRecording.count - Self.maxRaw)
+                }
+            }
+        }
     }
 }
 
