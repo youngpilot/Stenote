@@ -33,7 +33,10 @@ final class AudioCaptureService: @unchecked Sendable {
 
     /// Begin forwarding mic audio to the sinks. Fast on a warm engine. Throws
     /// `microphoneDenied` so the caller can surface the warning card.
-    func startCapture(
+    /// Fast, main-thread-safe setup: permission check, sinks, tap, converter.
+    /// Does NOT touch the engine I/O (no HAL block) — call `startEngine()` after,
+    /// off the main thread.
+    func prepareCapture(
         onBuffer: @escaping @Sendable (AVAudioPCMBuffer) -> Void,
         onLevel: @escaping @Sendable (Float) -> Void
     ) throws {
@@ -57,6 +60,12 @@ final class AudioCaptureService: @unchecked Sendable {
         // can be touching the converter concurrently.
         converter?.reset()
         active = true
+    }
+
+    /// Start the engine I/O. This does ~200ms of HAL setup, so call it OFF the
+    /// main thread — blocking the main thread here would stall the UI (the red
+    /// "starting" icon couldn't paint until the mic was actually live).
+    func startEngine() throws {
         if !engine.isRunning {
             engine.prepare()
             try engine.start()
