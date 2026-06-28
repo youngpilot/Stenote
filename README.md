@@ -83,7 +83,7 @@ Everything runs on your Mac — audio is transcribed on the Neural Engine and ne
 
 ## Credits
 
-[NVIDIA Parakeet TDT v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) (Apache 2.0) · [FluidAudio](https://github.com/FluidInference/FluidAudio) · icon [Solar](https://icon-sets.iconify.design/solar/) by 480 Design (CC BY 4.0).
+[NVIDIA Parakeet TDT v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) (model weights © NVIDIA, CC BY 4.0; used via FluidAudio's CoreML conversion) · [FluidAudio](https://github.com/FluidInference/FluidAudio) (Apache 2.0) · icon [Solar](https://icon-sets.iconify.design/solar/) by 480 Design (CC BY 4.0).
 
 ## License
 
