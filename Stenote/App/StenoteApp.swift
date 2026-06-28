@@ -63,6 +63,9 @@ struct StenoteApp: App {
 
     /// A file transcription just finished and is waiting to be seen — a calm green.
     static let micDoneIcon: NSImage = coloredMicIcon(top: "#34C759")
+
+    /// A cleaned transcript was just inserted — a brief indigo "AI cleanup" flash.
+    static let micCleanedIcon: NSImage = coloredMicIcon(top: "#6E64F2")
 }
 
 /// The menubar status item reflects state: a deep-red mic while recording; blue
@@ -99,6 +102,7 @@ private struct MenuBarLabel: View {
         // the icon turns red the instant the shortcut registers.
         if recordingManager.isStarting { return StenoteApp.micStartingIcon }
         if recordingManager.isRecording { return StenoteApp.micRecordingIcon }
+        if recordingManager.cleanupJustApplied { return StenoteApp.micCleanedIcon }
         if recordingManager.isTranscribingFile { return StenoteApp.micTranscribingIcon }
         if recordingManager.fileTranscriptionDone { return StenoteApp.micDoneIcon }
         return StenoteApp.micIdleIcon

@@ -21,6 +21,10 @@ final class RecordingManager {
 
     private(set) var isRecording = false
     private(set) var isStarting = false   // shortcut registered, engine spinning up (shows red)
+    /// Briefly true right after a cleaned transcript is inserted — drives a short
+    /// indigo "AI cleanup applied" flash on the menubar icon.
+    private(set) var cleanupJustApplied = false
+    private var cleanupCueTask: Task<Void, Never>?
     private(set) var isModelLoading = false
     private(set) var modelLoadError: String?
     private(set) var inputLevel: Float = 0.0   // smoothed mic level [0,1] for the meter
@@ -138,9 +142,14 @@ final class RecordingManager {
         // + start sound — BEFORE the audio engine spins up (~200ms HAL setup).
         stopAfterStart = false
         fileTranscriptionDone = false   // a new recording supersedes a stale "ready" badge
+        cleanupJustApplied = false; cleanupCueTask?.cancel()
         isStarting = true
         needsMicrophone = false
         SoundFeedback.playStart()
+
+        // If cleanup is enabled, warm the on-device model now so it's ready (fast)
+        // by the time recording stops.
+        if SettingsStore.shared.cleanupText { TextCleanupService.shared.prewarm() }
 
         outputService.rememberSourceApp()
         transcriptionService.beginCapturing()   // hold audio until ASR is ready
@@ -232,6 +241,17 @@ final class RecordingManager {
         logger.error("Failed to start capture: \(error.localizedDescription)")
     }
 
+    /// Flash the menubar icon indigo briefly to signal a cleaned transcript was
+    /// inserted (auto-clears after ~1.6s; recording/starting states take priority).
+    private func flashCleanupCue() {
+        cleanupCueTask?.cancel()
+        cleanupJustApplied = true
+        cleanupCueTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.6))
+            if !Task.isCancelled { cleanupJustApplied = false }
+        }
+    }
+
     func stopRecording() async {
         guard isRecording else { return }
         audioCaptureService.stopCapture()
@@ -262,9 +282,11 @@ final class RecordingManager {
         // Optional on-device AI cleanup (punctuation, capitalization, filler-word
         // removal). Opt-in; runs locally, text never leaves the Mac; falls back to
         // the original text on any failure.
+        var didClean = false
         if SettingsStore.shared.cleanupText, !finalText.isEmpty {
             showStatus("Cleaning up…")
             finalText = await TextCleanupService.shared.cleanup(finalText)
+            didClean = true
         }
 
         // Paste the COMPLETE transcript (with prefix/suffix) once — reliable,
@@ -278,6 +300,7 @@ final class RecordingManager {
 
             outputService.insertText(output)
             historyService.addEntry(output, duration: duration)
+            if didClean { flashCleanupCue() }
         }
 
         // Wait for all pending pastes to complete before ending session.
