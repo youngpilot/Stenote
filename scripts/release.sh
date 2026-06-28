@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-VERSION="1.1.0"
+VERSION="1.2.0"
 DIST_NAME="Steneo"     # user-facing app + DMG name
 BUILD_NAME="Stenote"   # internal Xcode product/scheme name (unchanged on purpose)
 TEAM_ID="${STENOTE_TEAM_ID:?Set STENOTE_TEAM_ID env var (Apple Developer Team ID)}"

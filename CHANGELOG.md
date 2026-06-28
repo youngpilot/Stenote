@@ -2,15 +2,16 @@
 
 All notable changes to Steneo. Dates are release dates; versions follow the app's `MARKETING_VERSION`.
 
-## 1.1.0
+## 1.2.0
 
 ### Added
 - **On-device AI text cleanup (opt-in)** — after dictation, Steneo can tidy your text right on your Mac: fix punctuation & capitalization and drop filler words (um, äh). It uses Apple's on-device model (Apple Intelligence) when available, with a built-in rule-based fallback otherwise. Nothing is ever sent anywhere. Enable it in **Settings → Text Cleanup**.
-- **Menubar icon reflects recording and file transcription** — the mic glyph turns deep red the moment recording starts (no amber warm-up state); calm **blue** while transcribing an audio file; calm **green** when the result is ready, clearing back to default the next time you open the popover.
 
 ### Changed
+- **More reliable & accurate transcription** — your whole recording is now transcribed in one full-context pass the moment you stop, instead of in live windows. This fixes words lost at the very start of a recording and garbled short clips, and improves overall accuracy. The text appears (and is pasted) when you stop.
 - **Renamed Stenote → Steneo.** Same app, same on-device engine — only the name. Your settings, history, and permissions carry over (the underlying identifier is unchanged).
-- **Snappier, more reliable start** — the recording icon and start sound now fire instantly. The audio engine spins up off the main thread so the red icon paints the moment you press the shortcut (no more "white, then red late"), the start/stop sounds are preloaded, and a press is never silently ignored while the speech model is still loading.
+- **Instant, honest recording feedback** — the start sound fires the instant you press, and the mic turns red only once it's actually capturing, so a red mic always means you're being recorded. The app no longer gets throttled when idle (App Nap), so the first press after a quiet spell is immediate too.
+- **Menubar icon states** — a deep-red mic while recording, calm **blue** while transcribing an audio file, calm **green** when a file result is ready (clearing the next time you open the popover).
 
 ## 1.0.0
 

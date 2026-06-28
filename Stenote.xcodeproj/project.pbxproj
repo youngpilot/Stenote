@@ -27,7 +27,6 @@
 		A10001000000000000000099 /* UpdateService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000099 /* UpdateService.swift */; };
 		A10001000000000000000098 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000098 /* OnboardingView.swift */; };
 		D5CC79748A1542A3AC4C6717 /* VoiceCommandService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5178128DCCD441D8396BC03 /* VoiceCommandService.swift */; };
-		204855D3C2B24E5697EDEAFD /* RingBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EFC8E0F196644678C25C326 /* RingBuffer.swift */; };
 		59A7FA083FE74BA3912763C0 /* WaveformView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 241AD4F7F22E4384AD139523 /* WaveformView.swift */; };
 		A10001000000000000000200 /* StreamingWindowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000200 /* StreamingWindowTests.swift */; };
 		A10001000000000000000201 /* StutterRemovalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10002000000000000000201 /* StutterRemovalTests.swift */; };
@@ -60,7 +59,6 @@
 		A10002000000000000000018 /* Stenote.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Stenote.entitlements; sourceTree = "<group>"; };
 		A10003000000000000000001 /* Stenote.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Stenote.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A5178128DCCD441D8396BC03 /* VoiceCommandService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCommandService.swift; sourceTree = "<group>"; };
-		1EFC8E0F196644678C25C326 /* RingBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RingBuffer.swift; sourceTree = "<group>"; };
 		241AD4F7F22E4384AD139523 /* WaveformView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaveformView.swift; sourceTree = "<group>"; };
 		A10003000000000000000002 /* StenoteTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = StenoteTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10002000000000000000200 /* StreamingWindowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingWindowTests.swift; sourceTree = "<group>"; };
@@ -167,7 +165,6 @@
 				A10002000000000000000017 /* SystemAudioService.swift */,
 				A10002000000000000000099 /* UpdateService.swift */,
 				A5178128DCCD441D8396BC03 /* VoiceCommandService.swift */,
-				1EFC8E0F196644678C25C326 /* RingBuffer.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -306,7 +303,6 @@
 				A10001000000000000000099 /* UpdateService.swift in Sources */,
 				A10001000000000000000098 /* OnboardingView.swift in Sources */,
 				D5CC79748A1542A3AC4C6717 /* VoiceCommandService.swift in Sources */,
-				204855D3C2B24E5697EDEAFD /* RingBuffer.swift in Sources */,
 				59A7FA083FE74BA3912763C0 /* WaveformView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -453,7 +449,7 @@
 				CODE_SIGN_ENTITLEMENTS = Stenote/Stenote.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 32;
 				DEVELOPMENT_TEAM = 5A4T37N77V;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -461,7 +457,7 @@
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Steneo needs Automation access to detect if music is playing, so it can pause during recording and resume when you stop.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Steneo uses your microphone to transcribe speech into text locally on your device. Audio never leaves your Mac.";
-				MARKETING_VERSION = 1.1.0;
+				MARKETING_VERSION = 1.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.youngpilot.Stenote;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -476,7 +472,7 @@
 				CODE_SIGN_ENTITLEMENTS = Stenote/Stenote.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 32;
 				DEVELOPMENT_TEAM = 5A4T37N77V;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -484,7 +480,7 @@
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Steneo needs Automation access to detect if music is playing, so it can pause during recording and resume when you stop.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Steneo uses your microphone to transcribe speech into text locally on your device. Audio never leaves your Mac.";
-				MARKETING_VERSION = 1.1.0;
+				MARKETING_VERSION = 1.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.youngpilot.Stenote;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -497,11 +493,11 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 32;
 				DEVELOPMENT_TEAM = 5A4T37N77V;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.2;
-				MARKETING_VERSION = 1.1.0;
+				MARKETING_VERSION = 1.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.youngpilot.StenoteTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -515,11 +511,11 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 32;
 				DEVELOPMENT_TEAM = 5A4T37N77V;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.2;
-				MARKETING_VERSION = 1.1.0;
+				MARKETING_VERSION = 1.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.youngpilot.StenoteTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
