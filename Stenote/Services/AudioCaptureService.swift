@@ -33,10 +33,15 @@ final class AudioCaptureService: @unchecked Sendable {
 
     /// Begin forwarding mic audio to the sinks. Fast on a warm engine. Throws
     /// `microphoneDenied` so the caller can surface the warning card.
-    /// Fast, main-thread-safe setup: permission check, sinks, tap, converter.
-    /// Does NOT touch the engine I/O (no HAL block) — call `startEngine()` after,
-    /// off the main thread.
-    func prepareCapture(
+    /// Begin forwarding mic audio to the sinks. Fast on a warm engine. Throws
+    /// `microphoneDenied` so the caller can surface the warning card.
+    ///
+    /// IMPORTANT: this runs synchronously, on the SAME thread as the tap install
+    /// (the main actor). AVAudioEngine is not thread-safe — starting the engine on
+    /// a background thread while the tap was installed on main drops/scrambles the
+    /// first buffers (lost + garbled words). Keep tap-install and engine.start()
+    /// together on one thread.
+    func startCapture(
         onBuffer: @escaping @Sendable (AVAudioPCMBuffer) -> Void,
         onLevel: @escaping @Sendable (Float) -> Void
     ) throws {
@@ -60,12 +65,6 @@ final class AudioCaptureService: @unchecked Sendable {
         // can be touching the converter concurrently.
         converter?.reset()
         active = true
-    }
-
-    /// Start the engine I/O. This does ~200ms of HAL setup, so call it OFF the
-    /// main thread — blocking the main thread here would stall the UI (the red
-    /// "starting" icon couldn't paint until the mic was actually live).
-    func startEngine() throws {
         if !engine.isRunning {
             engine.prepare()
             try engine.start()

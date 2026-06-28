@@ -165,10 +165,14 @@ final class RecordingManager {
 
         // Single ordered audio path: the tap yields into one stream that one
         // serial consumer drains in capture order (no per-buffer Tasks, no race).
+        // Single ordered audio path: the tap yields into one stream that one
+        // serial consumer drains in capture order (no per-buffer Tasks, no race).
+        // Engine start is SYNCHRONOUS on the main actor (same thread as the tap
+        // install) — starting it off-thread scrambles/drops the first buffers.
         let continuation = transcriptionService.startAudioPipeline()
         audioContinuation = continuation
         do {
-            try audioCaptureService.prepareCapture(
+            try audioCaptureService.startCapture(
                 onBuffer: { buffer in
                     nonisolated(unsafe) let b = buffer
                     continuation.yield(b)
@@ -185,60 +189,35 @@ final class RecordingManager {
                     }
                 }
             )
-        } catch {
-            captureDidFail(error)
-            return
-        }
+            isStarting = false
+            isRecording = true
+            recordingStartTime = Date()
+            needsAccessibility = !AXIsProcessTrusted()
 
-        // Start the engine OFF the main thread (~200ms HAL setup). Blocking the
-        // main thread here is what made the red "starting" icon fail to paint
-        // (you'd see white, then red late). Flip into recording once it's live;
-        // audio is buffered until the ASR is ready, so nothing is lost.
-        let capture = audioCaptureService
-        Task.detached(priority: .userInitiated) { [weak self] in
-            do {
-                try capture.startEngine()
-                await MainActor.run { self?.captureDidStart() }
-            } catch {
-                await MainActor.run { self?.captureDidFail(error) }
+            // Stop was pressed during startup — bring it down cleanly now (before
+            // muting media, so there's no audible blip).
+            if stopAfterStart {
+                stopAfterStart = false
+                Task { await stopRecording() }
+                return
             }
-        }
-    }
 
-    /// The mic engine is live — flip into the recording state (on the main actor).
-    private func captureDidStart() {
-        guard isStarting, !isRecording else { return }
-        isStarting = false
-        isRecording = true
-        recordingStartTime = Date()
-        needsAccessibility = !AXIsProcessTrusted()
-
-        // Stop was pressed during startup — bring it down cleanly now (before
-        // muting media, so there's no audible blip).
-        if stopAfterStart {
+            if SettingsStore.shared.silenceMediaWhileRecording {
+                systemAudio.muteOutput()
+            }
+            if SettingsStore.shared.pauseMediaApps {
+                systemAudio.pauseMediaApps()
+            }
+            // Prefix/suffix are pasted together with the full text when recording stops.
+        } catch {
+            isStarting = false
             stopAfterStart = false
-            Task { await stopRecording() }
-            return
+            if case AudioCaptureError.microphoneDenied = error {
+                let status = AVCaptureDevice.authorizationStatus(for: .audio)
+                needsMicrophone = (status == .denied || status == .restricted)
+            }
+            logger.error("Failed to start capture: \(error.localizedDescription)")
         }
-
-        if SettingsStore.shared.silenceMediaWhileRecording {
-            systemAudio.muteOutput()
-        }
-        if SettingsStore.shared.pauseMediaApps {
-            systemAudio.pauseMediaApps()
-        }
-        // Prefix/suffix are pasted together with the full text when recording stops.
-    }
-
-    private func captureDidFail(_ error: Error) {
-        isStarting = false
-        stopAfterStart = false
-        audioCaptureService.stopCapture()
-        if case AudioCaptureError.microphoneDenied = error {
-            let status = AVCaptureDevice.authorizationStatus(for: .audio)
-            needsMicrophone = (status == .denied || status == .restricted)
-        }
-        logger.error("Failed to start capture: \(error.localizedDescription)")
     }
 
     /// Flash the menubar icon indigo briefly to signal a cleaned transcript was
