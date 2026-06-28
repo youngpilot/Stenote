@@ -20,7 +20,7 @@ final class RecordingManager {
     let historyService = HistoryService.shared
 
     private(set) var isRecording = false
-    private(set) var isStarting = false   // shortcut registered, engine spinning up (yellow)
+    private(set) var isStarting = false   // shortcut registered, engine spinning up (shows red)
     private(set) var isModelLoading = false
     private(set) var modelLoadError: String?
     private(set) var inputLevel: Float = 0.0   // smoothed mic level [0,1] for the meter
@@ -92,6 +92,10 @@ final class RecordingManager {
         }
         isModelLoading = false
 
+        // Decode the feedback sounds up front so the first start/stop chirp has
+        // no load latency.
+        SoundFeedback.preload()
+
         // Warm up the audio engine so the first recording starts fast — only if
         // the mic is already granted, so we never touch it prematurely.
         if AVCaptureDevice.authorizationStatus(for: .audio) == .authorized {
@@ -116,7 +120,13 @@ final class RecordingManager {
     }
 
     func startRecording() {
-        guard !isRecording, !isStarting, transcriptionService.isModelLoaded else { return }
+        guard !isRecording, !isStarting else { return }
+        // Instant feedback instead of a silent no-op while the speech model is
+        // still loading (e.g. right after launch) — otherwise a press feels ignored.
+        guard transcriptionService.isModelLoaded else {
+            showStatus("Loading speech model…")
+            return
+        }
 
         let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
         if micStatus == .denied || micStatus == .restricted {
@@ -124,7 +134,7 @@ final class RecordingManager {
             return
         }
 
-        // Instant acknowledgement the moment the shortcut registers — yellow icon
+        // Instant acknowledgement the moment the shortcut registers — red icon
         // + start sound — BEFORE the audio engine spins up (~200ms HAL setup).
         stopAfterStart = false
         fileTranscriptionDone = false   // a new recording supersedes a stale "ready" badge
@@ -337,12 +347,22 @@ struct StatusMessage: Equatable {
 
 // MARK: - Sound Feedback
 
+@MainActor
 enum SoundFeedback {
-    static func playStart() {
-        NSSound(named: "Tink")?.play()
-    }
+    // Cache + reuse the NSSound instances so the first chirp has no decode
+    // latency and a press never waits on a fresh named-sound lookup.
+    private static let startSound = NSSound(named: "Tink")
+    private static let stopSound = NSSound(named: "Bottle")
 
-    static func playStop() {
-        NSSound(named: "Bottle")?.play()
+    static func playStart() { restart(startSound) }
+    static func playStop() { restart(stopSound) }
+
+    /// Force the sounds to decode up front (call once at launch).
+    static func preload() { _ = startSound; _ = stopSound }
+
+    private static func restart(_ sound: NSSound?) {
+        guard let sound else { return }
+        if sound.isPlaying { sound.stop() }   // allow rapid re-trigger
+        sound.play()
     }
 }
