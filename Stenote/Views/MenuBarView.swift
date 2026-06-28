@@ -1441,23 +1441,17 @@ private struct InlineSettingsView: View {
                     .textFieldStyle(.roundedBorder)
                 }
 
-                Toggle("AI cleanup", isOn: Binding(
+                Toggle("Remove filler words", isOn: Binding(
                     get: { settings.cleanupText },
                     set: { settings.cleanupText = $0 }
                 ))
                 .font(labelFont)
 
                 if settings.cleanupText {
-                    Text("Removes filler words (um, äh) and tidies light grammar on-device after dictation. (Punctuation & capitalization are already handled by the speech model.) Off = exactly what you said, with no extra wait.")
+                    Text("Drops spoken fillers (um, uh, äh, ähm) after dictation — instant, on-device, and never changes your wording. Punctuation & capitalization are already handled by the speech model. Off = exactly what you said.")
                         .font(labelFont)
                         .foregroundStyle(.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
-                    if !TextCleanupService.shared.usesAppleIntelligence {
-                        Text("Apple Intelligence isn't available here, so a lighter rule-based cleanup is used.")
-                            .font(labelFont)
-                            .foregroundStyle(.tertiary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
                 }
             }
 

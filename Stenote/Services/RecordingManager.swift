@@ -142,10 +142,6 @@ final class RecordingManager {
         needsMicrophone = false
         SoundFeedback.playStart()
 
-        // If cleanup is enabled, warm the on-device model now so it's ready (fast)
-        // by the time recording stops.
-        if SettingsStore.shared.cleanupText { TextCleanupService.shared.prewarm() }
-
         outputService.rememberSourceApp()
         transcriptionService.beginCapturing()   // hold audio until ASR is ready
         startTask = Task { @MainActor in await transcriptionService.startTranscription() }
@@ -266,12 +262,10 @@ final class RecordingManager {
         // not the cleanup pass.
         let duration = recordingStartTime.map { Date().timeIntervalSince($0) }
 
-        // Optional on-device AI cleanup (punctuation, capitalization, filler-word
-        // removal). Opt-in; runs locally, text never leaves the Mac; falls back to
-        // the original text on any failure.
+        // Optional on-device filler-word removal (opt-in, rule-based → instant,
+        // never changes wording). Punctuation/caps come from the speech model.
         if SettingsStore.shared.cleanupText, !finalText.isEmpty {
-            showStatus("Cleaning up…")
-            finalText = await TextCleanupService.shared.cleanup(finalText)
+            finalText = TextCleanupService.shared.cleanup(finalText)
         }
 
         // Paste the COMPLETE transcript (with prefix/suffix) once — reliable,

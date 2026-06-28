@@ -49,4 +49,9 @@ final class TextCleanupTests: XCTestCase {
         let s = "Hello world. This is fine."
         XCTAssertEqual(TextCleanupService.capitalizingSentences(s), s)
     }
+
+    func testRemovesExpandedAndRepeatedFillers() {
+        XCTAssertEqual(TextCleanupService.deterministicCleanup("erm okay, öhm done"), "Okay, done")
+        XCTAssertEqual(TextCleanupService.deterministicCleanup("uh uh hello"), "Hello")
+    }
 }

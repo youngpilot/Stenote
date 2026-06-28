@@ -5,7 +5,7 @@ All notable changes to Steneo. Dates are release dates; versions follow the app'
 ## 1.2.0
 
 ### Added
-- **On-device AI text cleanup (opt-in)** — after dictation, Steneo can tidy your text right on your Mac: fix punctuation & capitalization and drop filler words (um, äh). It uses Apple's on-device model (Apple Intelligence) when available, with a built-in rule-based fallback otherwise. Nothing is ever sent anywhere. Enable it in **Settings → Text Cleanup**.
+- **Remove filler words (opt-in)** — after dictation, Steneo can drop spoken fillers (um, uh, äh, ähm) right on your Mac. It's instant, rule-based, and never changes your actual wording — so it's safe in any language. Punctuation & capitalization already come from the speech model. Enable it in **Settings → Text Output**. (Smart formatting — paragraphs, bullet lists, "→ email / Slack", tone — is planned for a later version.)
 
 ### Changed
 - **More reliable & accurate transcription** — your whole recording is now transcribed in one full-context pass the moment you stop, instead of in live windows. This fixes words lost at the very start of a recording and garbled short clips, and improves overall accuracy. The text appears (and is pasted) when you stop.
