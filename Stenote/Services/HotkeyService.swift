@@ -1,6 +1,9 @@
 import AppKit
 import Carbon
 import Observation
+import os
+
+private let logger = Logger(subsystem: "com.youngpilot.Stenote", category: "Hotkey")
 
 @Observable
 @MainActor
@@ -43,13 +46,19 @@ final class HotkeyService {
     }
 
     private func handleFlagsChanged(_ event: NSEvent) {
+        // MEASUREMENT: how late the OS delivered this key event to our global
+        // monitor (physical press → here). High = the NSEvent monitor is the lag.
+        let ageMs = Int((ProcessInfo.processInfo.systemUptime - event.timestamp) * 1000)
         if currentHotkeys.contains(.doubleRightOption), event.keyCode == 61, event.modifierFlags.contains(.option) {
+            steneoTimingLog("hotkey delivery age \(ageMs)ms")
             checkDoublePress(); return
         }
         if currentHotkeys.contains(.doubleRightCmd), event.keyCode == 54, event.modifierFlags.contains(.command) {
+            steneoTimingLog("hotkey delivery age \(ageMs)ms")
             checkDoublePress(); return
         }
         if currentHotkeys.contains(.doubleFn), event.keyCode == 63, event.modifierFlags.contains(.function) {
+            steneoTimingLog("hotkey delivery age \(ageMs)ms")
             checkDoublePress(); return
         }
     }

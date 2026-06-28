@@ -118,16 +118,31 @@ final class AudioCaptureService: @unchecked Sendable {
 
     private func handleTap(_ buffer: AVAudioPCMBuffer, inputFormat: AVAudioFormat, targetFormat: AVAudioFormat) {
         guard active, let conv = converter else { return }
-        let frameCapacity = AVAudioFrameCount(
-            Double(buffer.frameLength) * targetFormat.sampleRate / inputFormat.sampleRate)
+        // Generous output capacity (round up + headroom) so the resampler output is
+        // never truncated.
+        let ratio = targetFormat.sampleRate / inputFormat.sampleRate
+        let frameCapacity = AVAudioFrameCount((Double(buffer.frameLength) * ratio).rounded(.up)) + 64
         guard let converted = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: frameCapacity) else { return }
 
+        // CRITICAL: hand the resampler this input buffer EXACTLY ONCE. The old code
+        // returned `buffer` on every input-block call, so when the resampler asked
+        // for more input (e.g. while priming its filter) it got the SAME buffer
+        // again → duplicated/garbled audio, worst at the start of a clip (so short
+        // clips came out mangled like "to tst wi siht's aus"). Return .noDataNow
+        // after the first hand-off; the converter keeps its filter state for the
+        // next call, giving a clean, continuous stream.
         var error: NSError?
-        conv.convert(to: converted, error: &error) { _, outStatus in
+        var didProvide = false
+        let status = conv.convert(to: converted, error: &error) { _, outStatus in
+            if didProvide {
+                outStatus.pointee = .noDataNow
+                return nil
+            }
+            didProvide = true
             outStatus.pointee = .haveData
             return buffer
         }
-        guard error == nil else { return }
+        guard status != .error, error == nil, converted.frameLength > 0 else { return }
 
         if let floatData = converted.floatChannelData, let onLevel {
             let count = Int(converted.frameLength)

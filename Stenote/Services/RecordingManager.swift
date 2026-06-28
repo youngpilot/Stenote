@@ -7,6 +7,21 @@ import UniformTypeIdentifiers
 
 private let logger = Logger(subsystem: "com.youngpilot.Stenote", category: "RecordingManager")
 
+/// TEMP diagnostic — the unified log isn't readable from the build environment,
+/// so append timing lines to a file we can read. Remove once start latency is fixed.
+func steneoTimingLog(_ message: String) {
+    let line = "\(String(format: "%.3f", Date().timeIntervalSince1970)) \(message)\n"
+    guard let data = line.data(using: .utf8) else { return }
+    let url = URL(fileURLWithPath: "/tmp/steneo-timing.log")
+    if let handle = try? FileHandle(forWritingTo: url) {
+        defer { try? handle.close() }
+        handle.seekToEndOfFile()
+        handle.write(data)
+    } else {
+        try? data.write(to: url)
+    }
+}
+
 @Observable
 @MainActor
 final class RecordingManager {
@@ -127,9 +142,11 @@ final class RecordingManager {
 
     func startRecording() {
         guard !isRecording, !isStarting else { return }
+        logger.notice("startRecording reached")
         // Instant feedback instead of a silent no-op while the speech model is
         // still loading (e.g. right after launch) — otherwise a press feels ignored.
         guard transcriptionService.isModelLoaded else {
+            logger.notice("startRecording: model NOT loaded yet")
             showStatus("Loading speech model…")
             return
         }
@@ -149,6 +166,7 @@ final class RecordingManager {
         isStarting = true
         needsMicrophone = false
         SoundFeedback.playStart()
+        steneoTimingLog("startRecording + start sound played")
 
         // If cleanup is enabled, warm the on-device model now so it's ready (fast)
         // by the time recording stops.
@@ -214,7 +232,7 @@ final class RecordingManager {
         recordingStartTime = Date()
         needsAccessibility = !AXIsProcessTrusted()
         if let pressTimestamp {
-            logger.info("press→live: \(Int(Date().timeIntervalSince(pressTimestamp) * 1000))ms")
+            steneoTimingLog("ENGINE LIVE, engine.start \(Int(Date().timeIntervalSince(pressTimestamp) * 1000))ms")
         }
 
         // Stop was pressed during startup — bring it down cleanly now (before
