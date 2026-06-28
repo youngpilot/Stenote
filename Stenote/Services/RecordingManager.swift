@@ -7,21 +7,6 @@ import UniformTypeIdentifiers
 
 private let logger = Logger(subsystem: "com.youngpilot.Stenote", category: "RecordingManager")
 
-/// TEMP diagnostic — the unified log isn't readable from the build environment,
-/// so append timing lines to a file we can read. Remove once start latency is fixed.
-func steneoTimingLog(_ message: String) {
-    let line = "\(String(format: "%.3f", Date().timeIntervalSince1970)) \(message)\n"
-    guard let data = line.data(using: .utf8) else { return }
-    let url = URL(fileURLWithPath: "/tmp/steneo-timing.log")
-    if let handle = try? FileHandle(forWritingTo: url) {
-        defer { try? handle.close() }
-        handle.seekToEndOfFile()
-        handle.write(data)
-    } else {
-        try? data.write(to: url)
-    }
-}
-
 @Observable
 @MainActor
 final class RecordingManager {
@@ -36,12 +21,6 @@ final class RecordingManager {
 
     private(set) var isRecording = false
     private(set) var isStarting = false   // shortcut registered, engine spinning up (shows red)
-    /// Briefly true right after a cleaned transcript is inserted — drives a short
-    /// indigo "AI cleanup applied" flash on the menubar icon.
-    private(set) var cleanupJustApplied = false
-    private var cleanupCueTask: Task<Void, Never>?
-    /// When the shortcut was pressed — measures press→live latency (Phase 0).
-    private var pressTimestamp: Date?
     private(set) var isModelLoading = false
     private(set) var modelLoadError: String?
     private(set) var inputLevel: Float = 0.0   // smoothed mic level [0,1] for the meter
@@ -142,11 +121,9 @@ final class RecordingManager {
 
     func startRecording() {
         guard !isRecording, !isStarting else { return }
-        logger.notice("startRecording reached")
         // Instant feedback instead of a silent no-op while the speech model is
         // still loading (e.g. right after launch) — otherwise a press feels ignored.
         guard transcriptionService.isModelLoaded else {
-            logger.notice("startRecording: model NOT loaded yet")
             showStatus("Loading speech model…")
             return
         }
@@ -161,12 +138,9 @@ final class RecordingManager {
         // + start sound — BEFORE the audio engine spins up (~200ms HAL setup).
         stopAfterStart = false
         fileTranscriptionDone = false   // a new recording supersedes a stale "ready" badge
-        cleanupJustApplied = false; cleanupCueTask?.cancel()
-        pressTimestamp = Date()
         isStarting = true
         needsMicrophone = false
         SoundFeedback.playStart()
-        steneoTimingLog("startRecording + start sound played")
 
         // If cleanup is enabled, warm the on-device model now so it's ready (fast)
         // by the time recording stops.
@@ -231,9 +205,6 @@ final class RecordingManager {
         isRecording = true   // RED == recording — only now that the mic is live
         recordingStartTime = Date()
         needsAccessibility = !AXIsProcessTrusted()
-        if let pressTimestamp {
-            steneoTimingLog("ENGINE LIVE, engine.start \(Int(Date().timeIntervalSince(pressTimestamp) * 1000))ms")
-        }
 
         // Stop was pressed during startup — bring it down cleanly now (before
         // muting media, so there's no audible blip).
@@ -263,17 +234,6 @@ final class RecordingManager {
             needsMicrophone = (status == .denied || status == .restricted)
         }
         logger.error("Capture failed: \(error.localizedDescription)")
-    }
-
-    /// Flash the menubar icon indigo briefly to signal a cleaned transcript was
-    /// inserted (auto-clears after ~1.6s; recording/starting states take priority).
-    private func flashCleanupCue() {
-        cleanupCueTask?.cancel()
-        cleanupJustApplied = true
-        cleanupCueTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(1.6))
-            if !Task.isCancelled { cleanupJustApplied = false }
-        }
     }
 
     func stopRecording() async {
@@ -306,11 +266,9 @@ final class RecordingManager {
         // Optional on-device AI cleanup (punctuation, capitalization, filler-word
         // removal). Opt-in; runs locally, text never leaves the Mac; falls back to
         // the original text on any failure.
-        var didClean = false
         if SettingsStore.shared.cleanupText, !finalText.isEmpty {
             showStatus("Cleaning up…")
             finalText = await TextCleanupService.shared.cleanup(finalText)
-            didClean = true
         }
 
         // Paste the COMPLETE transcript (with prefix/suffix) once — reliable,
@@ -324,7 +282,6 @@ final class RecordingManager {
 
             outputService.insertText(output)
             historyService.addEntry(output, duration: duration)
-            if didClean { flashCleanupCue() }
         }
 
         // Wait for all pending pastes to complete before ending session.
