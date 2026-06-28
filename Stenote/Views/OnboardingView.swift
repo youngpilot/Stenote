@@ -112,7 +112,7 @@ struct OnboardingView: View {
                 .resizable().renderingMode(.template)
                 .frame(width: 64, height: 64)
                 .foregroundStyle(.tint)
-            Text("Welcome to Stenote")
+            Text("Welcome to Steneo")
                 .font(.largeTitle).fontWeight(.semibold)
             Text("Type with your voice in any app. Press a shortcut, speak, and your words land at the cursor — everything runs on your Mac. No cloud, no account.")
                 .font(.body)
@@ -142,7 +142,7 @@ struct OnboardingView: View {
 
     private var permissionsStep: some View {
         VStack(alignment: .leading, spacing: 16) {
-            stepHeader("Permissions", "Stenote needs two permissions to work.")
+            stepHeader("Permissions", "Steneo needs two permissions to work.")
             permissionRow(
                 icon: "mic.fill",
                 title: "Microphone",
@@ -153,7 +153,7 @@ struct OnboardingView: View {
             permissionRow(
                 icon: "accessibility",
                 title: "Accessibility",
-                desc: "To type text into other apps and use the global shortcut. After you click Allow, enable Stenote in the list that opens.",
+                desc: "To type text into other apps and use the global shortcut. After you click Allow, enable Steneo in the list that opens.",
                 granted: axGranted,
                 action: requestAX
             )
@@ -209,7 +209,7 @@ struct OnboardingView: View {
             Toggle("Pause Spotify & Apple Music while recording", isOn: Binding(
                 get: { settings.pauseMediaApps },
                 set: { settings.pauseMediaApps = $0 }))
-            Toggle("Start Stenote at login", isOn: Binding(
+            Toggle("Start Steneo at login", isOn: Binding(
                 get: { settings.launchAtLogin },
                 set: { settings.launchAtLogin = $0 }))
             HStack {

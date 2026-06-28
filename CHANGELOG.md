@@ -1,8 +1,11 @@
 # Changelog
 
-All notable changes to Stenote. Dates are release dates; versions follow the app's `MARKETING_VERSION`.
+All notable changes to Steneo. Dates are release dates; versions follow the app's `MARKETING_VERSION`.
 
 ## 1.0.1
+
+### Changed
+- **Renamed Stenote → Steneo.** Same app, same on-device engine — only the name. Your settings, history, and permissions carry over (the underlying identifier is unchanged).
 
 ### Added
 - **Menubar icon reflects recording and file transcription** — the mic glyph turns deep red the moment recording starts (no amber warm-up state); calm **blue** while transcribing an audio file; calm **green** when the result is ready, clearing back to default the next time you open the popover.

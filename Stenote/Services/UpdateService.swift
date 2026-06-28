@@ -27,7 +27,7 @@ final class UpdateService {
     /// know whether a newer version exists — so the UI must not claim "up to date".
     private(set) var lastSuccess: Date?
 
-    private let repo = "youngpilot/Stenote"
+    private let repo = "youngpilot/Steneo"
     private let lastSuccessKey = "updateLastSuccess"
     private let nextEligibleKey = "updateNextEligible"
 

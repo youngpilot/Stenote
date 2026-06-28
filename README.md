@@ -1,18 +1,18 @@
 <p align="center">
-  <img src="assets/feature.png" alt="Stenote" width="640">
+  <img src="assets/feature.png" alt="Steneo" width="640">
 </p>
 
-# Stenote
+# Steneo
 
 **The voice-to-text app macOS should have built in.**
 
 _Free for private use · 100% on-device · no cloud, no API keys._
 
-Stenote is a native menubar app that turns your voice into text in any app. Speak, stop, and your words land at the cursor — everything runs on your Mac. Built on [NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) on the Apple Neural Engine (via the [FluidAudio SDK](https://github.com/FluidInference/FluidAudio)): faster than real-time, low hallucination, and 25 European languages auto-detected — and freely mixable in a single sentence (English plus your native language, or any combination).
+Steneo is a native menubar app that turns your voice into text in any app. Speak, stop, and your words land at the cursor — everything runs on your Mac. Built on [NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) on the Apple Neural Engine (via the [FluidAudio SDK](https://github.com/FluidInference/FluidAudio)): faster than real-time, low hallucination, and 25 European languages auto-detected — and freely mixable in a single sentence (English plus your native language, or any combination).
 
-## How Stenote compares
+## How Steneo compares
 
-| | Stenote | Apple Dictation | Wispr Flow | Whisper apps¹ |
+| | Steneo | Apple Dictation | Wispr Flow | Whisper apps¹ |
 |---|---|---|---|---|
 | **Compute** | 🟢 On-device (ANE) | 🟢 On-device | 🔴 Cloud | 🟢 On-device |
 | **Privacy** | 🟢 Never leaves your Mac | 🟢 On device | 🔴 Audio uploaded | 🟢 On device |
@@ -25,7 +25,7 @@ Stenote is a native menubar app that turns your voice into text in any app. Spea
 
 ¹ superwhisper, MacWhisper.  ·  Legend: 🟢 strength · 🟡 mixed · 🔴 limiting
 
-In short: Apple Dictation is private but weak, Wispr Flow is polished but cloud and paid, Whisper apps are local but heavier and hallucination-prone. Stenote is private, local, accurate, and free — without the trade-off.
+In short: Apple Dictation is private but weak, Wispr Flow is polished but cloud and paid, Whisper apps are local but heavier and hallucination-prone. Steneo is private, local, accurate, and free — without the trade-off.
 
 ## Features
 
@@ -50,8 +50,8 @@ English, German, French, Spanish, Italian, Portuguese, Dutch, Polish, Czech, Rom
 
 ## Install
 
-1. Download `Stenote-1.0.0.dmg` from the [latest release](https://github.com/youngpilot/Stenote/releases/latest).
-2. Open it, drag **Stenote** to Applications, and launch.
+1. Download the latest `.dmg` from the [latest release](https://github.com/youngpilot/Steneo/releases/latest).
+2. Open it, drag **Steneo** to Applications, and launch.
 3. Grant **Microphone** and **Accessibility** when prompted. The speech model (~460 MB) downloads once, then runs fully offline.
 
 Requires **macOS 15.2+** and **Apple Silicon** (M1 or later).
@@ -66,7 +66,7 @@ A short welcome on first launch walks you through permissions, your shortcut, an
 
 ## Build from source
 
-Swift 6 + SwiftUI. Requires **Xcode 16+** (developed on 26.5) and Apple Silicon.
+Swift 6 + SwiftUI. Requires **Xcode 16+** (developed on 26.5) and Apple Silicon. The Xcode project and scheme are still named `Stenote` internally (the user-facing app is Steneo).
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
@@ -79,7 +79,7 @@ The FluidAudio package resolves automatically; models download on first launch. 
 
 Everything runs on your Mac — audio is transcribed on the Neural Engine and never leaves the device, the recorded audio is never written to disk, and the only network request is the optional GitHub update check (off by default). Your **transcription history is encrypted at rest** (AES-GCM, with the key held in the macOS Keychain). Your **word corrections** and **prefix/suffix** text are your own configuration and live in local app preferences (`~/Library/Preferences/com.youngpilot.Stenote.plist`). History keeps the last 20 entries by default — set it to **None** or clear it any time from Settings, and **Reset to Defaults** wipes corrections and prefixes.
 
-> `StenoteIM/` is an experimental, not-yet-wired-in system-wide input method — optional, not needed to build or run Stenote.
+> `StenoteIM/` is an experimental, not-yet-wired-in system-wide input method — optional, not needed to build or run Steneo.
 
 ## Credits
 

@@ -193,8 +193,8 @@ struct MenuBarView: View {
                 }
                 .buttonStyle(SegmentButtonStyle())
                 .keyboardShortcut("q", modifiers: .command)
-                .help("Quit Stenote")
-                .accessibilityLabel("Quit Stenote")
+                .help("Quit Steneo")
+                .accessibilityLabel("Quit Steneo")
             }
             .font(.system(size: 14, weight: .medium))
             .background(
@@ -287,7 +287,7 @@ struct MenuBarView: View {
                     Text("Microphone access needed")
                         .font(.body)
                         .fontWeight(.medium)
-                    Text("Stenote can't hear you until you allow the microphone.")
+                    Text("Steneo can't hear you until you allow the microphone.")
                         .font(.body)
                         .foregroundStyle(.secondary)
                 }
@@ -312,7 +312,7 @@ struct MenuBarView: View {
                     Text("Accessibility permission required")
                         .font(.body)
                         .fontWeight(.medium)
-                    Text("Stenote needs this to type text into other apps.")
+                    Text("Steneo needs this to type text into other apps.")
                         .font(.body)
                         .foregroundStyle(.secondary)
                 }
@@ -688,13 +688,13 @@ struct MenuBarView: View {
 
     private func saveEntryAsTxt(_ entry: HistoryEntry) {
         let dir = SettingsStore.shared.exportDirectory
-        let filename = "Stenote_\(entry.formattedId)_\(formatDurationFilename(entry.duration)).txt"
+        let filename = "Steneo_\(entry.formattedId)_\(formatDurationFilename(entry.duration)).txt"
         let url = URL(fileURLWithPath: dir).appendingPathComponent(filename)
 
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
 
-        var content = "Stenote Recording #\(entry.formattedId)\n"
+        var content = "Steneo Recording #\(entry.formattedId)\n"
         content += "Date: \(dateFormatter.string(from: entry.timestamp))\n"
         if let duration = entry.duration {
             content += "Duration: \(formatDuration(duration))\n"
@@ -791,10 +791,10 @@ struct MenuBarView: View {
 
     private var checkForUpdateLabel: String {
         let v = updater.currentVersion
-        if updater.isChecking { return "Stenote \(v) - Checking…" }
-        if showUpToDate { return "Stenote \(v) - Up to date" }
-        if updater.lastCheckFailed { return "Stenote \(v) - Check failed, retry" }
-        return "Stenote \(v) - Check for Update"
+        if updater.isChecking { return "Steneo \(v) - Checking…" }
+        if showUpToDate { return "Steneo \(v) - Up to date" }
+        if updater.lastCheckFailed { return "Steneo \(v) - Check failed, retry" }
+        return "Steneo \(v) - Check for Update"
     }
 
     /// Left side of the footer status: the install link when an update is pending,
@@ -804,7 +804,7 @@ struct MenuBarView: View {
             Button {
                 NSWorkspace.shared.open(url)
             } label: {
-                Text("Install Stenote Update (\(updater.currentVersion))→(\(updater.latestVersion ?? ""))")
+                Text("Install Steneo Update (\(updater.currentVersion))→(\(updater.latestVersion ?? ""))")
                     .font(.caption)
                     .foregroundStyle(Color.blue)
             }
@@ -859,9 +859,9 @@ struct MenuBarView: View {
         if recordingManager.modelLoadError != nil { return "Model error" }
         if recordingManager.isModelLoaded {
             if settings.silenceMediaWhileRecording, !audioService.supportsVolumeControl {
-                return "Stenote is Ready — can't mute this audio device"
+                return "Steneo is Ready — can't mute this audio device"
             }
-            return "Stenote is Ready"
+            return "Steneo is Ready"
         }
         return "Initializing..."
     }
@@ -1245,8 +1245,8 @@ private struct InlineSettingsView: View {
                 }
 
                 Text(settings.updateCheckMode == .daily
-                     ? "Stenote checks GitHub once a day. One request, no account, nothing sent."
-                     : "No automatic checks. Stenote makes no network calls unless you press Check Now.")
+                     ? "Steneo checks GitHub once a day. One request, no account, nothing sent."
+                     : "No automatic checks. Steneo makes no network calls unless you press Check Now.")
                     .font(labelFont)
                     .foregroundStyle(.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1523,15 +1523,15 @@ private struct InlineSettingsView: View {
 
             HStack {
                 Button {
-                    if let url = URL(string: "https://github.com/youngpilot/Stenote") {
+                    if let url = URL(string: "https://github.com/youngpilot/Steneo") {
                         NSWorkspace.shared.open(url)
                     }
                 } label: {
-                    Text("Stenote on GitHub →")
+                    Text("Steneo on GitHub →")
                 }
                 .buttonStyle(LinkHoverButtonStyle())
                 Spacer()
-                Text("Stenote v\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
+                Text("Steneo v\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
                     .foregroundStyle(.quaternary)
             }
             .font(.caption)
