@@ -8,12 +8,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var rightClickMonitor: Any?
     private var windowObserver: Any?
     private var popoverKeyObserver: Any?
+    private var appNapActivity: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Under XCTest the app is only a test host — skip the heavy bootstrap
         // (model download, mic/accessibility prompts, global hotkey monitor).
         if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil { return }
         logger.info("Stenote launching...")
+
+        // Opt out of App Nap so the global hotkey, the red mic icon, and the start
+        // sound fire INSTANTLY. A windowless menubar agent (LSUIElement) is a prime
+        // App Nap target: when idle, macOS throttles its run loop / coalesces timers
+        // and events, adding up to ~1s to the first shortcut press after a quiet
+        // spell. Held for the app's lifetime; we still allow the Mac to sleep.
+        appNapActivity = ProcessInfo.processInfo.beginActivity(
+            options: .userInitiatedAllowingIdleSystemSleep,
+            reason: "Instant global-hotkey response")
         installRightClickMonitor()
         configureMenuBarPanel()
         observePopoverOpen()
