@@ -25,6 +25,8 @@ final class RecordingManager {
     /// indigo "AI cleanup applied" flash on the menubar icon.
     private(set) var cleanupJustApplied = false
     private var cleanupCueTask: Task<Void, Never>?
+    /// When the shortcut was pressed — measures press→live latency (Phase 0).
+    private var pressTimestamp: Date?
     private(set) var isModelLoading = false
     private(set) var modelLoadError: String?
     private(set) var inputLevel: Float = 0.0   // smoothed mic level [0,1] for the meter
@@ -143,6 +145,7 @@ final class RecordingManager {
         stopAfterStart = false
         fileTranscriptionDone = false   // a new recording supersedes a stale "ready" badge
         cleanupJustApplied = false; cleanupCueTask?.cancel()
+        pressTimestamp = Date()
         isStarting = true
         needsMicrophone = false
         SoundFeedback.playStart()
@@ -155,9 +158,9 @@ final class RecordingManager {
         transcriptionService.beginCapturing()   // hold audio until ASR is ready
         startTask = Task { @MainActor in await transcriptionService.startTranscription() }
 
-        // Defer the engine start so the "starting" state paints first; audio
-        // captured once it's up is buffered (no lost words).
-        DispatchQueue.main.async { [weak self] in self?.beginCapture() }
+        // beginCapture starts the engine off-main on a dedicated queue and returns
+        // immediately; we flip to red only once the mic is actually live.
+        beginCapture()
     }
 
     private func beginCapture() {
@@ -167,57 +170,81 @@ final class RecordingManager {
         // serial consumer drains in capture order (no per-buffer Tasks, no race).
         // Single ordered audio path: the tap yields into one stream that one
         // serial consumer drains in capture order (no per-buffer Tasks, no race).
-        // Engine start is SYNCHRONOUS on the main actor (same thread as the tap
-        // install) — starting it off-thread scrambles/drops the first buffers.
         let continuation = transcriptionService.startAudioPipeline()
         audioContinuation = continuation
-        do {
-            try audioCaptureService.startCapture(
-                onBuffer: { buffer in
-                    nonisolated(unsafe) let b = buffer
-                    continuation.yield(b)
-                },
-                onLevel: { [weak self] level in
-                    Task { @MainActor in
-                        // Ignore callbacks enqueued before stop so a late one can't
-                        // overwrite the inputLevel reset.
-                        guard let self, self.isRecording else { return }
-                        // Asymmetric ballistics: fast attack, slow release — peaks
-                        // pop instantly, then decay gracefully (level-meter feel).
-                        let alpha: Float = level > self.inputLevel ? 0.6 : 0.2
-                        self.inputLevel += alpha * (level - self.inputLevel)
-                    }
+        // Engine start runs on AudioCaptureService's dedicated serial queue (off
+        // main, but ONE thread for all engine ops → safe). We enter the recording
+        // state — and turn the icon red — only once the engine is actually live, so
+        // "red == recording" with no lost first words.
+        audioCaptureService.startCapture(
+            onBuffer: { buffer in
+                nonisolated(unsafe) let b = buffer
+                continuation.yield(b)
+            },
+            onLevel: { [weak self] level in
+                Task { @MainActor in
+                    // Ignore callbacks enqueued before stop so a late one can't
+                    // overwrite the inputLevel reset.
+                    guard let self, self.isRecording else { return }
+                    // Asymmetric ballistics: fast attack, slow release.
+                    let alpha: Float = level > self.inputLevel ? 0.6 : 0.2
+                    self.inputLevel += alpha * (level - self.inputLevel)
                 }
-            )
-            isStarting = false
-            isRecording = true
-            recordingStartTime = Date()
-            needsAccessibility = !AXIsProcessTrusted()
+            },
+            completion: { [weak self] error in
+                Task { @MainActor in self?.captureCompleted(error) }
+            }
+        )
+    }
 
-            // Stop was pressed during startup — bring it down cleanly now (before
-            // muting media, so there's no audible blip).
-            if stopAfterStart {
-                stopAfterStart = false
-                Task { await stopRecording() }
-                return
-            }
-
-            if SettingsStore.shared.silenceMediaWhileRecording {
-                systemAudio.muteOutput()
-            }
-            if SettingsStore.shared.pauseMediaApps {
-                systemAudio.pauseMediaApps()
-            }
-            // Prefix/suffix are pasted together with the full text when recording stops.
-        } catch {
-            isStarting = false
-            stopAfterStart = false
-            if case AudioCaptureError.microphoneDenied = error {
-                let status = AVCaptureDevice.authorizationStatus(for: .audio)
-                needsMicrophone = (status == .denied || status == .restricted)
-            }
-            logger.error("Failed to start capture: \(error.localizedDescription)")
+    /// Called on the main actor once the audio engine reports a result.
+    private func captureCompleted(_ error: AudioCaptureError?) {
+        if let error { captureFailed(error); return }
+        // Torn down during start-up (stop pressed, etc.) — stop the engine that
+        // just went live instead of entering the recording state.
+        guard isStarting, !isRecording else {
+            audioCaptureService.stopCapture()
+            audioContinuation?.finish()
+            audioContinuation = nil
+            return
         }
+
+        isStarting = false
+        isRecording = true   // RED == recording — only now that the mic is live
+        recordingStartTime = Date()
+        needsAccessibility = !AXIsProcessTrusted()
+        if let pressTimestamp {
+            logger.info("press→live: \(Int(Date().timeIntervalSince(pressTimestamp) * 1000))ms")
+        }
+
+        // Stop was pressed during startup — bring it down cleanly now (before
+        // muting media, so there's no audible blip).
+        if stopAfterStart {
+            stopAfterStart = false
+            Task { await stopRecording() }
+            return
+        }
+
+        if SettingsStore.shared.silenceMediaWhileRecording {
+            systemAudio.muteOutput()
+        }
+        if SettingsStore.shared.pauseMediaApps {
+            systemAudio.pauseMediaApps()
+        }
+        // Prefix/suffix are pasted together with the full text when recording stops.
+    }
+
+    private func captureFailed(_ error: AudioCaptureError) {
+        isStarting = false
+        stopAfterStart = false
+        audioCaptureService.stopCapture()
+        audioContinuation?.finish()
+        audioContinuation = nil
+        if error == .microphoneDenied {
+            let status = AVCaptureDevice.authorizationStatus(for: .audio)
+            needsMicrophone = (status == .denied || status == .restricted)
+        }
+        logger.error("Capture failed: \(error.localizedDescription)")
     }
 
     /// Flash the menubar icon indigo briefly to signal a cleaned transcript was

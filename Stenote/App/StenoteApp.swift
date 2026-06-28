@@ -52,12 +52,6 @@ struct StenoteApp: App {
     /// Static (no animation, no level fill); shown the moment recording starts.
     static let micRecordingIcon: NSImage = coloredMicIcon(top: "#E04848")
 
-    /// The brief "got it, starting up" window between the keypress and the mic
-    /// engine being live. Same red as recording — we no longer show a separate
-    /// colour to the user (the old amber starting state is gone); it just makes
-    /// the icon turn red the instant the shortcut registers.
-    static let micStartingIcon: NSImage = micRecordingIcon
-
     /// Transcribing an audio file — a calm blue.
     static let micTranscribingIcon: NSImage = coloredMicIcon(top: "#3B82F6")
 
@@ -98,9 +92,8 @@ private struct MenuBarLabel: View {
     }
 
     private var icon: NSImage {
-        // Starting + recording are the same red (no user-facing distinction) —
-        // the icon turns red the instant the shortcut registers.
-        if recordingManager.isStarting { return StenoteApp.micStartingIcon }
+        // Red == actually recording (only once the mic is live), so a red mic
+        // always means "your audio is being captured" — never a dead warm-up window.
         if recordingManager.isRecording { return StenoteApp.micRecordingIcon }
         if recordingManager.cleanupJustApplied { return StenoteApp.micCleanedIcon }
         if recordingManager.isTranscribingFile { return StenoteApp.micTranscribingIcon }

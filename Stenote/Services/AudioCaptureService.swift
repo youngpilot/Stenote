@@ -6,12 +6,18 @@ private let logger = Logger(subsystem: "com.youngpilot.Stenote", category: "Audi
 
 /// Captures microphone audio as 16 kHz mono for the ASR.
 ///
-/// The `AVAudioEngine` is created once and reused for the app's lifetime: it's
-/// warmed up ahead of time so the first start is fast and every later start is
-/// near-instant. The mic is only live between `startCapture()` and
-/// `stopCapture()` — there is no always-on microphone (or always-on indicator).
+/// The `AVAudioEngine` is created once and reused for the app's lifetime; it's
+/// warmed up ahead of time so the first start is fast. The mic is only live
+/// between `startCapture()` and `stopCapture()` — there is no always-on
+/// microphone (or always-on indicator).
+///
+/// THREADING: every AVAudioEngine operation (prepare / tap install / start /
+/// stop) runs on the single serial `engineQueue`. AVAudioEngine is not
+/// thread-safe — mixing main-thread tap-install with a background-thread start
+/// scrambles/drops the first buffers (the 55461fa regression). One queue, always.
 final class AudioCaptureService: @unchecked Sendable {
     private let engine = AVAudioEngine()
+    private let engineQueue = DispatchQueue(label: "com.youngpilot.Stenote.audioengine", qos: .userInitiated)
     private let targetFormat = AVAudioFormat(
         commonFormat: .pcmFormatFloat32, sampleRate: 16000, channels: 1, interleaved: false)!
 
@@ -26,59 +32,68 @@ final class AudioCaptureService: @unchecked Sendable {
     /// Allocate engine resources ahead of time (no mic I/O, no indicator) so the
     /// first real start is fast. Call once at launch, only when mic is granted.
     func prepareEngine() {
-        refreshTapIfNeeded()
-        engine.prepare()
-        logger.debug("Engine prepared")
+        engineQueue.async { [self] in
+            refreshTapIfNeeded()
+            engine.prepare()
+            logger.debug("Engine prepared")
+        }
     }
 
-    /// Begin forwarding mic audio to the sinks. Fast on a warm engine. Throws
-    /// `microphoneDenied` so the caller can surface the warning card.
-    /// Begin forwarding mic audio to the sinks. Fast on a warm engine. Throws
-    /// `microphoneDenied` so the caller can surface the warning card.
-    ///
-    /// IMPORTANT: this runs synchronously, on the SAME thread as the tap install
-    /// (the main actor). AVAudioEngine is not thread-safe — starting the engine on
-    /// a background thread while the tap was installed on main drops/scrambles the
-    /// first buffers (lost + garbled words). Keep tap-install and engine.start()
-    /// together on one thread.
+    /// Begin forwarding mic audio to the sinks. All engine I/O runs on
+    /// `engineQueue` (off the main thread, but always the SAME thread). The audio
+    /// engine start (~HAL setup) is the only unavoidable latency before the mic is
+    /// live — there's no always-on mic. `completion` reports `nil` on success
+    /// (engine live → capturing) or an error; the caller hops it to the main actor
+    /// and only then flips into the recording state (red == recording).
     func startCapture(
         onBuffer: @escaping @Sendable (AVAudioPCMBuffer) -> Void,
-        onLevel: @escaping @Sendable (Float) -> Void
-    ) throws {
+        onLevel: @escaping @Sendable (Float) -> Void,
+        completion: @escaping @Sendable (AudioCaptureError?) -> Void
+    ) {
         let status = AVCaptureDevice.authorizationStatus(for: .audio)
         logger.debug("Mic permission status: \(status.rawValue, privacy: .public)")
-        if status == .denied || status == .restricted { throw AudioCaptureError.microphoneDenied }
+        if status == .denied || status == .restricted { completion(.microphoneDenied); return }
         if status == .notDetermined {
             AVCaptureDevice.requestAccess(for: .audio) { granted in
                 logger.debug("Mic permission granted: \(granted, privacy: .public)")
             }
-            throw AudioCaptureError.microphoneDenied
+            completion(.microphoneDenied); return
         }
 
         self.onBuffer = onBuffer
         self.onLevel = onLevel
 
-        refreshTapIfNeeded()
-        // Clear any resampler filter state left over from a previous session so
-        // each recording starts clean. Safe here (unlike in stopCapture): the
-        // engine is stopped and the tap is inactive, so no render-thread callback
-        // can be touching the converter concurrently.
-        converter?.reset()
-        active = true
-        if !engine.isRunning {
-            engine.prepare()
-            try engine.start()
+        engineQueue.async { [self] in
+            do {
+                refreshTapIfNeeded()
+                // Clear any resampler filter state from the previous session. Safe
+                // here: the engine is stopped and the tap is inactive, so no
+                // render-thread callback can be touching the converter.
+                converter?.reset()
+                active = true
+                if !engine.isRunning {
+                    engine.prepare()
+                    try engine.start()
+                }
+                completion(nil)
+            } catch {
+                active = false
+                logger.error("Failed to start engine: \(error.localizedDescription, privacy: .public)")
+                completion(.engineStartFailed)
+            }
         }
     }
 
     func stopCapture() {
-        active = false
-        if engine.isRunning { engine.stop() }   // mic off; engine kept warm for next time
+        active = false   // stop forwarding immediately (handleTap guards on this)
+        engineQueue.async { [self] in
+            if engine.isRunning { engine.stop() }   // mic off; engine kept warm for next time
+        }
     }
 
     /// (Re)install the tap if it's missing or the input format changed since last
     /// time (e.g. the user switched audio device between recordings). Only ever
-    /// called while stopped/starting — never mid-recording.
+    /// called on `engineQueue` while stopped/starting — never mid-recording.
     private func refreshTapIfNeeded() {
         let input = engine.inputNode
         let inputFormat = input.outputFormat(forBus: 0)
@@ -142,12 +157,14 @@ enum AudioCaptureError: Error, LocalizedError {
     case microphoneDenied
     case formatError
     case converterError
+    case engineStartFailed
 
     var errorDescription: String? {
         switch self {
         case .microphoneDenied: "Microphone access is denied"
         case .formatError: "Failed to create audio format"
         case .converterError: "Failed to create audio converter"
+        case .engineStartFailed: "Failed to start the audio engine"
         }
     }
 }
