@@ -21,6 +21,7 @@ final class RecordingManager {
 
     private(set) var isRecording = false
     private(set) var isStarting = false   // shortcut registered, engine spinning up (shows red)
+    private(set) var isPostProcessing = false   // post-record on-device LLM pass (AI cleanup / formatting) running
     private(set) var isModelLoading = false
     private(set) var modelLoadError: String?
     private(set) var inputLevel: Float = 0.0   // smoothed mic level [0,1] for the meter
@@ -144,6 +145,7 @@ final class RecordingManager {
 
         // In AI mode, warm the on-device model now so cleanup is fast at stop.
         if SettingsStore.shared.cleanupMode == .ai { TextCleanupService.shared.prewarm() }
+        if SettingsStore.shared.formatMode != .none { FormattingService.shared.prewarm(mode: SettingsStore.shared.formatMode) }
 
         outputService.rememberSourceApp()
         transcriptionService.beginCapturing()   // hold audio until ASR is ready
@@ -265,13 +267,23 @@ final class RecordingManager {
         // not the cleanup pass.
         let duration = recordingStartTime.map { Date().timeIntervalSince($0) }
 
-        // Optional on-device cleanup. Rules = instant filler removal (never changes
-        // wording); AI = on-device LLM (can rephrase). Off = skip. Punctuation/caps
-        // come from the speech model regardless.
+        // Optional on-device post-processing: cleanup (lexical) then formatting
+        // (structure). Both run locally, never leave the Mac, and fall back to the
+        // input on any failure. The menubar mic pulses warm-yellow while an LLM pass
+        // runs (AI cleanup or any format mode).
         let cleanupMode = SettingsStore.shared.cleanupMode
+        let formatMode = SettingsStore.shared.formatMode
+        let willPostProcess = cleanupMode == .ai || formatMode != .none
+        if willPostProcess { isPostProcessing = true }
+        defer { if willPostProcess { isPostProcessing = false } }
+
         if cleanupMode != .off, !finalText.isEmpty {
             if cleanupMode == .ai { showStatus("Cleaning up…") }
             finalText = await TextCleanupService.shared.cleanup(finalText, mode: cleanupMode)
+        }
+        if formatMode != .none, !finalText.isEmpty {
+            showStatus("Formatting…")
+            finalText = await FormattingService.shared.format(finalText, mode: formatMode)
         }
 
         // Paste the COMPLETE transcript (with prefix/suffix) once — reliable,

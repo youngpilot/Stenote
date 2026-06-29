@@ -205,6 +205,12 @@ final class SettingsStore {
         didSet { UserDefaults.standard.set(cleanupMode.rawValue, forKey: "cleanupMode") }
     }
 
+    /// How dictated text is structured after cleanup: None / Paragraphs / Bullets.
+    /// Default None. Paragraphs/Bullets use the on-device LLM; text never leaves the Mac.
+    var formatMode: FormatMode {
+        didSet { UserDefaults.standard.set(formatMode.rawValue, forKey: "formatMode") }
+    }
+
     var insertionMode: InsertionMode {
         didSet { UserDefaults.standard.set(insertionMode.rawValue, forKey: "insertionMode") }
     }
@@ -260,6 +266,7 @@ final class SettingsStore {
         pauseMediaApps = true
         enableVocabBoosting = false
         cleanupMode = .off
+        formatMode = .none
         insertionMode = .auto
         enableVoiceCommands = false
         enabledVoiceCommandIDs = Set(VoiceCommandID.allCases.map(\.rawValue))
@@ -305,6 +312,7 @@ final class SettingsStore {
         } else {
             self.cleanupMode = ud.bool(forKey: "cleanupText") ? .rules : .off
         }
+        self.formatMode = FormatMode(rawValue: ud.string(forKey: "formatMode") ?? "") ?? .none
         self.insertionMode = InsertionMode(rawValue: ud.string(forKey: "insertionMode") ?? "") ?? .auto
         self.enableVoiceCommands = ud.bool(forKey: "enableVoiceCommands")
         self.enabledVoiceCommandIDs = (ud.array(forKey: "enabledVoiceCommandIDs") as? [String]).map(Set.init)

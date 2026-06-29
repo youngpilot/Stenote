@@ -1477,6 +1477,37 @@ private struct InlineSettingsView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
+
+                settingsRow("Format") {
+                    Picker("", selection: Binding(
+                        get: { settings.formatMode },
+                        set: { settings.formatMode = $0 }
+                    )) {
+                        ForEach(FormatMode.allCases) { mode in
+                            Text(mode.label).tag(mode)
+                        }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                }
+
+                if settings.formatMode == .paragraphs {
+                    Text("Splits your dictation into paragraphs at topic shifts — on-device, keeps your wording.")
+                        .font(labelFont)
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if settings.formatMode == .bullets {
+                    Text("Turns your dictation into a bullet list — on-device. Keeps the meaning; may tighten wording.")
+                        .font(labelFont)
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if settings.formatMode != .none, !FormattingService.shared.usesAppleIntelligence {
+                    Text("Formatting needs Apple Intelligence (macOS 26+), which isn't available here — text is left unformatted.")
+                        .font(labelFont)
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
 
             // Word Corrections

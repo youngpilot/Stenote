@@ -68,10 +68,10 @@ private struct MenuBarLabel: View {
     @State private var recordingManager = RecordingManager.shared
     @State private var dimmed = false
 
-    /// Only the file-transcription (blue) state uses the timed breathe — recording
-    /// shows the live red level instead.
+    /// The yellow "processing" states use the timed breathe (file transcription and
+    /// the post-record LLM pass) — recording shows static red instead.
     private var isBreathing: Bool {
-        recordingManager.isTranscribingFile && !recordingManager.isRecording
+        (recordingManager.isTranscribingFile || recordingManager.isPostProcessing) && !recordingManager.isRecording
     }
 
     var body: some View {
@@ -93,7 +93,7 @@ private struct MenuBarLabel: View {
         // Red == actually recording (only once the mic is live), so a red mic
         // always means "your audio is being captured" — never a dead warm-up window.
         if recordingManager.isRecording { return StenoteApp.micRecordingIcon }
-        if recordingManager.isTranscribingFile { return StenoteApp.micTranscribingIcon }
+        if recordingManager.isTranscribingFile || recordingManager.isPostProcessing { return StenoteApp.micTranscribingIcon }
         if recordingManager.fileTranscriptionDone { return StenoteApp.micDoneIcon }
         return StenoteApp.micIdleIcon
     }
