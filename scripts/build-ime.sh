@@ -17,8 +17,8 @@ INSTALLED_APP="$INSTALL_DIR/SteneoIM.app"
 
 BUNDLE_ID="com.youngpilot.Steneo.InputMethod"
 EXECUTABLE="SteneoIM"
-TEAM_ID="${STENOTE_TEAM_ID:?Set STENOTE_TEAM_ID env var (your Apple Developer Team ID, e.g. ABCDE12345)}"
-SIGNER="Developer ID Application: ${STENOTE_SIGNER_NAME:?Set STENOTE_SIGNER_NAME env var (e.g. 'Your Name')} ($TEAM_ID)"
+TEAM_ID="${STENEO_TEAM_ID:?Set STENEO_TEAM_ID env var (your Apple Developer Team ID, e.g. ABCDE12345)}"
+SIGNER="Developer ID Application: ${STENEO_SIGNER_NAME:?Set STENEO_SIGNER_NAME env var (e.g. 'Your Name')} ($TEAM_ID)"
 
 NOTARIZE=false
 for arg in "$@"; do

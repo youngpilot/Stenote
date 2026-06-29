@@ -11,11 +11,11 @@ final class WPMTests: XCTestCase {
     }
 
     func testWordCount() {
-        XCTAssertEqual("hello world".stenoteWordCount, 2)
-        XCTAssertEqual("  hello   world  ".stenoteWordCount, 2)   // extra whitespace dropped
-        XCTAssertEqual("one\ntwo\tthree".stenoteWordCount, 3)     // newlines + tabs split
-        XCTAssertEqual("".stenoteWordCount, 0)
-        XCTAssertEqual("Hello, world!".stenoteWordCount, 2)        // punctuation stays attached
+        XCTAssertEqual("hello world".steneoWordCount, 2)
+        XCTAssertEqual("  hello   world  ".steneoWordCount, 2)   // extra whitespace dropped
+        XCTAssertEqual("one\ntwo\tthree".steneoWordCount, 3)     // newlines + tabs split
+        XCTAssertEqual("".steneoWordCount, 0)
+        XCTAssertEqual("Hello, world!".steneoWordCount, 2)        // punctuation stays attached
     }
 
     func testBasicWPM() {

@@ -31,7 +31,7 @@ struct HistoryEntry: Codable, Identifiable {
     /// can't distort the average.
     var wpm: Double? {
         guard let duration, duration >= 3.0 else { return nil }
-        let words = wordCount ?? text.stenoteWordCount
+        let words = wordCount ?? text.steneoWordCount
         guard words >= 5 else { return nil }
         let value = Double(words) / (duration / 60.0)
         return (value >= 10 && value <= 400) ? value : nil
@@ -41,7 +41,7 @@ struct HistoryEntry: Codable, Identifiable {
 extension String {
     /// Word count by Unicode whitespace, empty tokens dropped. Note: under-counts
     /// non-space-delimited scripts (CJK/Thai) — acceptable for a dictation-pace stat.
-    var stenoteWordCount: Int {
+    var steneoWordCount: Int {
         split(whereSeparator: { $0.isWhitespace || $0.isNewline }).count
     }
 }
@@ -72,7 +72,7 @@ final class HistoryService {
 
         totalRecordings += 1
         let entry = HistoryEntry(text: trimmed, duration: duration, recordingId: totalRecordings,
-                                 wordCount: trimmed.stenoteWordCount)
+                                 wordCount: trimmed.steneoWordCount)
         entries.insert(entry, at: 0)
 
         if let cap = SettingsStore.shared.historyLength.cap, entries.count > cap {

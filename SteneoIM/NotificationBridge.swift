@@ -3,10 +3,10 @@ import InputMethodKit
 
 // Notification names shared between Steneo main app and this IME process.
 extension Notification.Name {
-    static let stenoteStartComposition  = Notification.Name("com.youngpilot.Steneo.startComposition")
-    static let stenoteUpdateComposition = Notification.Name("com.youngpilot.Steneo.updateComposition")
-    static let stenoteCommitComposition = Notification.Name("com.youngpilot.Steneo.commitComposition")
-    static let stenoteCancelComposition = Notification.Name("com.youngpilot.Steneo.cancelComposition")
+    static let steneoStartComposition  = Notification.Name("com.youngpilot.Steneo.startComposition")
+    static let steneoUpdateComposition = Notification.Name("com.youngpilot.Steneo.updateComposition")
+    static let steneoCommitComposition = Notification.Name("com.youngpilot.Steneo.commitComposition")
+    static let steneoCancelComposition = Notification.Name("com.youngpilot.Steneo.cancelComposition")
 }
 
 final class NotificationBridge {
@@ -19,10 +19,10 @@ final class NotificationBridge {
 
     func start() {
         let dnc = DistributedNotificationCenter.default()
-        dnc.addObserver(self, selector: #selector(handleStart(_:)),  name: .stenoteStartComposition,  object: nil)
-        dnc.addObserver(self, selector: #selector(handleUpdate(_:)), name: .stenoteUpdateComposition, object: nil)
-        dnc.addObserver(self, selector: #selector(handleCommit(_:)), name: .stenoteCommitComposition, object: nil)
-        dnc.addObserver(self, selector: #selector(handleCancel(_:)), name: .stenoteCancelComposition, object: nil)
+        dnc.addObserver(self, selector: #selector(handleStart(_:)),  name: .steneoStartComposition,  object: nil)
+        dnc.addObserver(self, selector: #selector(handleUpdate(_:)), name: .steneoUpdateComposition, object: nil)
+        dnc.addObserver(self, selector: #selector(handleCommit(_:)), name: .steneoCommitComposition, object: nil)
+        dnc.addObserver(self, selector: #selector(handleCancel(_:)), name: .steneoCancelComposition, object: nil)
     }
 
     // MARK: - Handlers
