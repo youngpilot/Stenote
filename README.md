@@ -66,20 +66,20 @@ A short welcome on first launch walks you through permissions, your shortcut, an
 
 ## Build from source
 
-Swift 6 + SwiftUI. Requires **Xcode 16+** (developed on 26.5) and Apple Silicon. The Xcode project and scheme are still named `Stenote` internally (the user-facing app is Steneo).
+Swift 6 + SwiftUI. Requires **Xcode 16+** (developed on 26.5) and Apple Silicon. The Xcode project and scheme are still named `Steneo` internally (the user-facing app is Steneo).
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-  xcodebuild -project Stenote.xcodeproj -scheme Stenote -configuration Debug build
+  xcodebuild -project Steneo.xcodeproj -scheme Steneo -configuration Debug build
 ```
 
 The FluidAudio package resolves automatically; models download on first launch. The committed project pins a `DEVELOPMENT_TEAM`, so when building from the command line set your own (`xcodebuild … DEVELOPMENT_TEAM=YOURTEAMID`) or pass `CODE_SIGNING_ALLOWED=NO`; opening in Xcode and picking your team in *Signing & Capabilities* also works.
 
 ## Privacy & data
 
-Everything runs on your Mac — audio is transcribed on the Neural Engine and never leaves the device, the recorded audio is never written to disk, and the only network request is the optional GitHub update check (off by default). Your **transcription history is encrypted at rest** (AES-GCM, with the key held in the macOS Keychain). Your **word corrections** and **prefix/suffix** text are your own configuration and live in local app preferences (`~/Library/Preferences/com.youngpilot.Stenote.plist`). History keeps the last 20 entries by default — set it to **None** or clear it any time from Settings, and **Reset to Defaults** wipes corrections and prefixes.
+Everything runs on your Mac — audio is transcribed on the Neural Engine and never leaves the device, the recorded audio is never written to disk, and the only network request is the optional GitHub update check (off by default). Your **transcription history is encrypted at rest** (AES-GCM, with the key held in the macOS Keychain). Your **word corrections** and **prefix/suffix** text are your own configuration and live in local app preferences (`~/Library/Preferences/com.youngpilot.Steneo.plist`). History keeps the last 20 entries by default — set it to **None** or clear it any time from Settings, and **Reset to Defaults** wipes corrections and prefixes.
 
-> `StenoteIM/` is an experimental, not-yet-wired-in system-wide input method — optional, not needed to build or run Steneo.
+> `SteneoIM/` is an experimental, not-yet-wired-in system-wide input method — optional, not needed to build or run Steneo.
 
 ## Credits
 

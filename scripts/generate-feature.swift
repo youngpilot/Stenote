@@ -8,7 +8,7 @@ let iconSize = 256
 let projectDir = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
 
 // Load the 512@2x icon (1024px)
-let iconPath = projectDir.appendingPathComponent("Stenote/Assets.xcassets/AppIcon.appiconset/icon_512_512_2x.png")
+let iconPath = projectDir.appendingPathComponent("Steneo/Assets.xcassets/AppIcon.appiconset/icon_512_512_2x.png")
 guard let iconImage = NSImage(contentsOf: iconPath) else {
     fatalError("Could not load icon from \(iconPath.path)")
 }
@@ -41,12 +41,12 @@ let iconY = CGFloat(height - iconSize) / 2 + 40
 let iconRect = NSRect(x: iconX, y: iconY, width: CGFloat(iconSize), height: CGFloat(iconSize))
 iconImage.draw(in: iconRect, from: .zero, operation: .sourceOver, fraction: 1.0)
 
-// Draw "Stenote" text below icon
+// Draw "Steneo" text below icon
 let textAttrs: [NSAttributedString.Key: Any] = [
     .font: NSFont.systemFont(ofSize: 48, weight: .semibold),
     .foregroundColor: NSColor.white
 ]
-let text = "Stenote" as NSString
+let text = "Steneo" as NSString
 let textSize = text.size(withAttributes: textAttrs)
 let textX = CGFloat(width) / 2 - textSize.width / 2
 let textY = iconY - textSize.height - 20

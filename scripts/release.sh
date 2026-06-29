@@ -3,16 +3,16 @@ set -euo pipefail
 
 VERSION="1.3.0"
 DIST_NAME="Steneo"     # user-facing app + DMG name
-BUILD_NAME="Stenote"   # internal Xcode product/scheme name (unchanged on purpose)
+BUILD_NAME="Steneo"   # internal Xcode product/scheme name (unchanged on purpose)
 TEAM_ID="${STENOTE_TEAM_ID:?Set STENOTE_TEAM_ID env var (Apple Developer Team ID)}"
-BUNDLE_ID="com.youngpilot.Stenote"   # unchanged: keeps TCC perms + Keychain history key
+BUNDLE_ID="com.youngpilot.Steneo"   # unchanged: keeps TCC perms + Keychain history key
 IDENTITY="Developer ID Application: ${STENOTE_SIGNER_NAME:?Set STENOTE_SIGNER_NAME env var (e.g. 'Your Name')} ($TEAM_ID)"
 NOTARY_PROFILE="${STENOTE_NOTARY_PROFILE:-notary}"
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="$PROJECT_DIR/build/release"
 DD="$BUILD_DIR/dd"
-BUILT_APP="$DD/Build/Products/Release/$BUILD_NAME.app"   # what xcodebuild produces (Stenote.app)
+BUILT_APP="$DD/Build/Products/Release/$BUILD_NAME.app"   # what xcodebuild produces (Steneo.app)
 APP_PATH="$BUILD_DIR/$DIST_NAME.app"                     # renamed distributable (Steneo.app)
 DMG_PATH="$BUILD_DIR/$DIST_NAME-$VERSION.dmg"
 ZIP_PATH="$BUILD_DIR/$DIST_NAME-$VERSION.zip"
@@ -24,7 +24,7 @@ mkdir -p "$BUILD_DIR"
 # Build into a dedicated derivedDataPath (NOT SYMROOT — SYMROOT splits the SPM
 # product dir and breaks resolution of swift-nio's transitive deps).
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild \
-    -project "$PROJECT_DIR/Stenote.xcodeproj" \
+    -project "$PROJECT_DIR/Steneo.xcodeproj" \
     -scheme "$BUILD_NAME" \
     -configuration Release \
     -derivedDataPath "$DD" \
@@ -37,7 +37,7 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild \
 
 # Rename the built bundle to the user-facing name. The code signature seals the
 # bundle *contents*, not its directory name, so this stays valid (the display
-# name comes from CFBundleDisplayName=Steneo; the executable stays Stenote).
+# name comes from CFBundleDisplayName=Steneo; the executable stays Steneo).
 echo ""
 echo "=== Packaging as $DIST_NAME.app ==="
 rm -rf "$APP_PATH"
