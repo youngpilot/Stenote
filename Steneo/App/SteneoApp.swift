@@ -48,8 +48,14 @@ struct SteneoApp: App {
         return image
     }
 
+    /// Arming — the instant the shortcut/click registers, while the mic engine spins
+    /// live (the brief HAL warm-up). An orange cue gives a press immediate visual
+    /// feedback; it flips to red the moment the mic is actually capturing. Orange ≠
+    /// red on purpose: orange = starting, red = recording (so red never lies).
+    static let micStartingIcon: NSImage = coloredMicIcon(top: "#FF9500")
+
     /// Recording — a clean, deep-red mic head with the stand adapting to light/dark.
-    /// Static (no animation, no level fill); shown the moment recording starts.
+    /// Static (no animation, no level fill); shown the moment the mic is live.
     static let micRecordingIcon: NSImage = coloredMicIcon(top: "#E04848")
 
     /// Transcribing an audio file — a warm yellow that matches the drag-over
@@ -90,9 +96,11 @@ private struct MenuBarLabel: View {
     }
 
     private var icon: NSImage {
-        // Red == actually recording (only once the mic is live), so a red mic
-        // always means "your audio is being captured" — never a dead warm-up window.
+        // Orange the instant a press registers (arming), red only once the mic is
+        // actually live — so red always means "your audio is being captured", and a
+        // press still gets immediate feedback during the brief engine warm-up.
         if recordingManager.isRecording { return SteneoApp.micRecordingIcon }
+        if recordingManager.isStarting { return SteneoApp.micStartingIcon }
         if recordingManager.isTranscribingFile || recordingManager.isPostProcessing { return SteneoApp.micTranscribingIcon }
         if recordingManager.fileTranscriptionDone { return SteneoApp.micDoneIcon }
         return SteneoApp.micIdleIcon
