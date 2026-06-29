@@ -2,6 +2,13 @@
 
 All notable changes to Steneo. Dates are release dates; versions follow the app's `MARKETING_VERSION`.
 
+## 1.3.1
+
+### Changed
+- **Reworked first-run onboarding** — shorter and clearer: permissions are requested up front (so the app stops nagging for them later), a built-in **test recording** lets you try it immediately, and a screen explains the menubar mic colors and the three ways to start/stop. Deeper features moved to optional "expert" screens you can skip.
+- **Instant recording feedback** — the menubar mic turns **orange the instant you press** (arming), then red the moment it's actually capturing, so a press always gives immediate feedback.
+- **Renamed to Steneo throughout** — the app's internal identifier is now `com.youngpilot.Steneo`. **One-time:** if you used an earlier build, macOS will ask you to re-grant Microphone & Accessibility and your settings reset to defaults — a clean slate.
+
 ## 1.3.0
 
 ### Added
