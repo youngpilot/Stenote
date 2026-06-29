@@ -41,6 +41,21 @@ final class TranscriptionService {
     private var vadStreamState: VadStreamState = .initial()
     private var lastSpeechTime: Date?
 
+    // --- Incremental segmentation (long recordings) ---
+    // At a clear mid-recording pause, once the current segment is long enough, the
+    // finished segment's raw audio is transcribed in the BACKGROUND. At stop only the
+    // final tail is transcribed, so the stop→paste wait stays short regardless of
+    // length. Boundaries fall on VAD silence (never mid-word), so accuracy holds.
+    private var lastCutTime: Date?
+    private var cutPending = false                    // at most one cut per silence period
+    private var segmentIndex = 0
+    private var segmentResults: [Int: String] = [:]   // cut index → transcribed text
+    private var segmentTasks: [Task<Void, Never>] = []
+    /// Injected by RecordingManager: hand over the raw audio recorded since the last cut.
+    var segmentProvider: (() -> (samples: [Float], rate: Double))?
+    private static let minSegmentSeconds: TimeInterval = 30   // only long recordings segment
+    private static let cutSilenceSeconds: TimeInterval = 0.8  // a clear pause = safe cut point
+
     // Language detection + confidence (set from the batch result where available)
     private(set) var detectedLanguage = ""
     private(set) var lastConfidence: Float = 0
@@ -114,6 +129,12 @@ final class TranscriptionService {
         vadBuffer = []
         vadStreamState = .initial()
         lastSpeechTime = Date()
+        lastCutTime = Date()
+        cutPending = false
+        segmentIndex = 0
+        segmentResults = [:]
+        segmentTasks.forEach { $0.cancel() }
+        segmentTasks = []
         detectedLanguage = ""
         lastConfidence = 0
         minTokenConfidence = 0
@@ -156,7 +177,13 @@ final class TranscriptionService {
         isCapturing = false
         guard isTranscribing else { return currentText }
         isTranscribing = false
-        await transcribeRecording(rawSamples, rate: rate)
+        // Finish any in-flight background segment transcriptions, then transcribe the
+        // final tail (the WHOLE recording if no cut ever fired) and assemble in order.
+        for task in segmentTasks { await task.value }
+        let tail = await rawTranscribe(rawSamples, rate: rate)
+        var ordered: [String] = []
+        for i in 0..<segmentIndex { ordered.append(segmentResults[i] ?? "") }
+        finalize(Self.assembleSegments(ordered, tail: tail))
         return currentText
     }
 
@@ -174,36 +201,45 @@ final class TranscriptionService {
         return manager
     }
 
-    /// Transcribe the buffered recording with the batch engine (full context),
-    /// then apply the shared text pipeline. Sets `currentText`.
-    private func transcribeRecording(_ rawSamples: [Float], rate: Double) async {
-        // ONE clean conversion of the whole recording (input rate → 16 kHz), like
-        // the file path — no per-buffer resampler warm-up to garble short clips.
+    /// Transcribe one chunk of raw audio (a segment, or the whole recording) with the
+    /// batch engine. ONE clean conversion (input rate → 16 kHz, like the file path) +
+    /// de-stutter. Returns "" on too-short/failure. The word-replacement/voice-command
+    /// pass runs ONCE on the assembled text (`finalize`), not per chunk.
+    private func rawTranscribe(_ rawSamples: [Float], rate: Double) async -> String {
         let samples = (rate <= 0 || rate == 16000) ? rawSamples : Self.resample(rawSamples, from: rate)
-        guard samples.count >= 1600 else {   // < ~0.1 s of audio — nothing to do
-            currentText = ""
-            return
-        }
+        guard samples.count >= 1600 else { return "" }   // < ~0.1 s of audio — nothing to do
         do {
             let asr = try await batchEngine()
             let result = try await asr.transcribe(samples, source: .microphone)
             let trimmed = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { currentText = ""; return }
-
-            var corrected = postProcess(trimmed)
-            corrected = Self.removeTrailingStutter(corrected)
-
-            let recognizer = NLLanguageRecognizer()
-            recognizer.processString(corrected)
-            if let lang = recognizer.dominantLanguage?.rawValue {
-                detectedLanguage = String(lang.prefix(2))
-            }
-            currentText = corrected
-            logger.info("batch transcript (\(corrected.count) chars): \(corrected.prefix(120))…")
+            guard !trimmed.isEmpty else { return "" }
+            return Self.removeTrailingStutter(trimmed)
         } catch {
-            logger.error("Batch transcription failed: \(error.localizedDescription)")
-            currentText = ""
+            logger.error("Transcription failed: \(error.localizedDescription)")
+            return ""
         }
+    }
+
+    /// Apply the shared text pipeline (word replacements + voice commands) ONCE over
+    /// the full assembled transcript, detect language, and set `currentText`.
+    private func finalize(_ combined: String) {
+        let trimmed = combined.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { currentText = ""; return }
+        var corrected = postProcess(trimmed)
+        corrected = Self.removeTrailingStutter(corrected)   // catch any replacement-induced trailing repeat
+        let recognizer = NLLanguageRecognizer()
+        recognizer.processString(corrected)
+        if let lang = recognizer.dominantLanguage?.rawValue {
+            detectedLanguage = String(lang.prefix(2))
+        }
+        currentText = corrected
+        logger.info("final transcript (\(corrected.count) chars): \(corrected.prefix(120))…")
+    }
+
+    /// Join finished segments (in cut order) + the final tail, dropping empties.
+    /// Pure → unit-tested.
+    static func assembleSegments(_ segments: [String], tail: String) -> String {
+        (segments + [tail]).filter { !$0.isEmpty }.joined(separator: " ")
     }
 
     /// Single-shot resample of a complete mono signal (input rate → `outRate`),
@@ -291,7 +327,11 @@ final class TranscriptionService {
 
                 if result.state.triggered {
                     lastSpeechTime = Date()
+                    cutPending = false
                 }
+
+                // Background-transcribe a finished segment at a clear mid-recording pause.
+                maybeCutSegment()
 
                 // Auto-stop after prolonged silence
                 let timeout = SettingsStore.shared.autoStopTimeout
@@ -305,6 +345,34 @@ final class TranscriptionService {
                 // VAD error — continue
             }
         }
+    }
+
+    /// Fire a segment cut when we're in a clear pause and the current segment is long
+    /// enough to be worth transcribing on its own (only long recordings trigger this).
+    private func maybeCutSegment() {
+        guard segmentProvider != nil, !cutPending, !vadStreamState.triggered,
+              let lastSpeech = lastSpeechTime, let lastCut = lastCutTime else { return }
+        let now = Date()
+        guard now.timeIntervalSince(lastSpeech) >= Self.cutSilenceSeconds,
+              now.timeIntervalSince(lastCut) >= Self.minSegmentSeconds else { return }
+        cutPending = true
+        cutSegment()
+    }
+
+    /// Snapshot the raw audio since the last cut and transcribe it in the background;
+    /// the result is reassembled in order at stop.
+    private func cutSegment() {
+        guard let provider = segmentProvider else { return }
+        let segment = provider()
+        lastCutTime = Date()
+        let index = segmentIndex
+        segmentIndex += 1
+        let task = Task { @MainActor [weak self] in
+            let text = await self?.rawTranscribe(segment.samples, rate: segment.rate) ?? ""
+            self?.segmentResults[index] = text
+            logger.info("segment \(index) transcribed (\(text.count) chars)")
+        }
+        segmentTasks.append(task)
     }
 
     // MARK: - Text pipeline

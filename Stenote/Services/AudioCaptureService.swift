@@ -30,6 +30,7 @@ final class AudioCaptureService: @unchecked Sendable {
     // ones. All access serialized on engineQueue (no render-thread lock).
     private var rawRecording: [Float] = []
     private var rawRate: Double = 0
+    private var segmentStart = 0   // index of the first sample not yet handed off to a segment cut
     private static let maxRaw = 48_000 * 60 * 10   // ~10 min @ 48 kHz cap
 
     // Per-recording sinks; the tap forwards to them only while `active`.
@@ -79,6 +80,7 @@ final class AudioCaptureService: @unchecked Sendable {
                 converter?.reset()
                 rawRecording = []
                 rawRate = 0
+                segmentStart = 0
                 active = true
                 if !engine.isRunning {
                     engine.prepare()
@@ -100,13 +102,27 @@ final class AudioCaptureService: @unchecked Sendable {
         }
     }
 
-    /// The raw recorded audio (ch0, at the input sample rate) + its rate, for one
-    /// clean single-shot conversion at stop. Clears the buffer.
+    /// The raw audio recorded since the last segment cut (the WHOLE recording if no
+    /// cut fired) + its rate, for the final single-shot conversion at stop. Clears
+    /// the buffer.
     func takeRecording() -> (samples: [Float], rate: Double) {
         engineQueue.sync {
-            let result = (rawRecording, rawRate)
+            let tail = segmentStart < rawRecording.count ? Array(rawRecording[segmentStart...]) : []
             rawRecording = []
-            return result
+            segmentStart = 0
+            return (tail, rawRate)
+        }
+    }
+
+    /// Hand over the raw audio recorded since the last cut WITHOUT clearing the
+    /// buffer (advances the segment marker) — for mid-recording incremental
+    /// transcription of finished segments.
+    func takeSegment() -> (samples: [Float], rate: Double) {
+        engineQueue.sync {
+            guard segmentStart < rawRecording.count else { return ([], rawRate) }
+            let slice = Array(rawRecording[segmentStart...])
+            segmentStart = rawRecording.count
+            return (slice, rawRate)
         }
     }
 
@@ -196,7 +212,9 @@ final class AudioCaptureService: @unchecked Sendable {
                 rawRecording.append(contentsOf: chunk)
                 rawRate = rate
                 if rawRecording.count > Self.maxRaw {
-                    rawRecording.removeFirst(rawRecording.count - Self.maxRaw)
+                    let drop = rawRecording.count - Self.maxRaw
+                    rawRecording.removeFirst(drop)
+                    segmentStart = max(0, segmentStart - drop)   // keep the marker valid after trimming
                 }
             }
         }

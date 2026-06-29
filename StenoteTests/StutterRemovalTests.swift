@@ -44,4 +44,24 @@ final class StutterRemovalTests: XCTestCase {
         XCTAssertEqual(strip(""), "")
         XCTAssertEqual(strip("hello"), "hello")
     }
+
+    // MARK: - Incremental-segmentation assembly
+
+    func testAssembleSegments() {
+        XCTAssertEqual(
+            TranscriptionService.assembleSegments(["First part.", "Second part."], tail: "And the end."),
+            "First part. Second part. And the end.")
+        // No cut fired → just the tail (= whole recording).
+        XCTAssertEqual(
+            TranscriptionService.assembleSegments([], tail: "just the whole thing"),
+            "just the whole thing")
+        // Empty pieces (failed/blank segment, or a silence-only tail) are dropped.
+        XCTAssertEqual(
+            TranscriptionService.assembleSegments(["a", "", "c"], tail: "d"),
+            "a c d")
+        XCTAssertEqual(
+            TranscriptionService.assembleSegments(["only segment"], tail: ""),
+            "only segment")
+        XCTAssertEqual(TranscriptionService.assembleSegments([], tail: ""), "")
+    }
 }

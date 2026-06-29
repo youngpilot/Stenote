@@ -148,6 +148,9 @@ final class RecordingManager {
         if SettingsStore.shared.formatMode != .none { FormattingService.shared.prewarm(mode: SettingsStore.shared.formatMode) }
 
         outputService.rememberSourceApp()
+        // Let the transcription service pull finished segments' raw audio for
+        // background transcription during long recordings.
+        transcriptionService.segmentProvider = { [audioCaptureService] in audioCaptureService.takeSegment() }
         transcriptionService.beginCapturing()   // hold audio until ASR is ready
         startTask = Task { @MainActor in await transcriptionService.startTranscription() }
 
