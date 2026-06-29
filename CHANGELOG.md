@@ -5,13 +5,13 @@ All notable changes to Steneo. Dates are release dates; versions follow the app'
 ## 1.2.0
 
 ### Added
-- **Remove filler words (opt-in)** — after dictation, Steneo can drop spoken fillers (um, uh, äh, ähm) right on your Mac. It's instant, rule-based, and never changes your actual wording — so it's safe in any language. Punctuation & capitalization already come from the speech model. Enable it in **Settings → Text Output**. (Smart formatting — paragraphs, bullet lists, "→ email / Slack", tone — is planned for a later version.)
+- **On-device text cleanup (opt-in)** — after dictation Steneo can tidy your text, right on your Mac. Pick in **Settings → Text Output → Cleanup**: **Rules** drops spoken fillers (um, äh) instantly and never changes your wording (safe in any language); **AI** uses Apple's on-device model for a smarter pass (also light grammar; can rephrase); **Off** keeps it verbatim. Nothing is ever sent anywhere. (Smart formatting — paragraphs, bullet lists, "→ email / Slack", tone — is planned for a later version.)
 
 ### Changed
 - **More reliable & accurate transcription** — your whole recording is now transcribed in one full-context pass the moment you stop, instead of in live windows. This fixes words lost at the very start of a recording and garbled short clips, and improves overall accuracy. The text appears (and is pasted) when you stop.
 - **Renamed Stenote → Steneo.** Same app, same on-device engine — only the name. Your settings, history, and permissions carry over (the underlying identifier is unchanged).
 - **Instant, honest recording feedback** — the start sound fires the instant you press, and the mic turns red only once it's actually capturing, so a red mic always means you're being recorded. The app no longer gets throttled when idle (App Nap), so the first press after a quiet spell is immediate too.
-- **Menubar icon states** — a deep-red mic while recording, calm **blue** while transcribing an audio file, calm **green** when a file result is ready (clearing the next time you open the popover).
+- **Menubar icon states & clearer file drop** — a deep-red mic while recording, a warm-**yellow** mic while transcribing an audio file, **green** when a file result is ready. Dragging an audio file onto the popover now shows a clear warm-yellow "drop to transcribe" target, so it's obvious the file will be picked up.
 
 ## 1.0.0
 
