@@ -804,7 +804,7 @@ struct MenuBarView: View {
     }
 
     /// Left side of the footer status: the install link when an update is pending,
-    /// otherwise the status dot + text (+ live language/confidence while recording).
+    /// otherwise the status dot + text.
     @ViewBuilder private var statusLeading: some View {
         if updater.updateAvailable, !recordingManager.isRecording, let url = updater.releaseURL {
             Button {
@@ -823,21 +823,6 @@ struct MenuBarView: View {
                 Text(statusText)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                if recordingManager.isRecording, !recordingManager.detectedLanguage.isEmpty {
-                    Text("·")
-                        .foregroundStyle(.tertiary)
-                    Text(recordingManager.detectedLanguage.uppercased())
-                        .font(.body)
-                        .fontWeight(.medium)
-                        .foregroundStyle(.secondary)
-                }
-                if recordingManager.isRecording, recordingManager.avgTokenConfidence > 0 {
-                    Text("·")
-                        .foregroundStyle(.tertiary)
-                    Text("\(Int(recordingManager.avgTokenConfidence * 100))%")
-                        .font(.body)
-                        .foregroundStyle(recordingManager.minTokenConfidence < 0.5 ? .orange : .secondary)
-                }
             }
         }
     }
@@ -1532,52 +1517,13 @@ private struct InlineSettingsView: View {
 
             // Word Corrections
             SettingsCard(title: "Word Corrections", isExpanded: expandedSection == "Word Corrections", onToggle: { toggleSection("Word Corrections") }) {
-                Text("Wrong → Right corrections always work. Boost-only words (no \"Wrong\") need Model Boosting enabled.")
+                Text("Fix words the speech model consistently mishears: enter the wrong spelling and its correction. Applied to every transcript.")
                     .font(labelFont)
                     .foregroundStyle(.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Toggle("Model Boosting", isOn: Binding(
-                    get: { settings.enableVocabBoosting },
-                    set: { newValue in
-                        settings.enableVocabBoosting = newValue
-                        if newValue { recordingManager.prepareVocabularyBoosting() }
-                    }
-                ))
-                .font(labelFont)
-
-                if settings.enableVocabBoosting {
-                    if recordingManager.isVocabModelLoading {
-                        HStack(alignment: .top, spacing: 6) {
-                            ProgressView().controlSize(.small)
-                            Text("Downloading boosting model (~98 MB, one-time)…")
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .font(labelFont)
-                    } else if recordingManager.vocabModelLoadFailed {
-                        HStack(alignment: .top, spacing: 6) {
-                            Image(systemName: "wifi.exclamationmark")
-                                .foregroundStyle(.orange)
-                            Text("Couldn't download the boosting model. It needs internet once — it will retry on your next recording.")
-                                .foregroundStyle(.orange)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .font(labelFont)
-                    }
-
-                    HStack(alignment: .top, spacing: 6) {
-                        Image(systemName: "info.circle")
-                            .foregroundStyle(.secondary)
-                        Text("Works best for single, distinctive words (4+ letters). It only swaps a word when it's acoustically confident, so it rarely affects other text.")
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .font(labelFont)
-                }
-
                 HStack(spacing: 4) {
-                    TextField("Wrong (optional)", text: $newFrom)
+                    TextField("Wrong", text: $newFrom)
                         .textFieldStyle(.roundedBorder)
                     Image(systemName: "arrow.right")
                         .foregroundStyle(.tertiary)
@@ -1587,21 +1533,10 @@ private struct InlineSettingsView: View {
                     Button { addWord() } label: {
                         Image(systemName: "plus.circle.fill")
                     }
-                    .disabled(newTo.isEmpty || tooShortBoostWord)
+                    .disabled(newFrom.isEmpty || newTo.isEmpty)
                     .buttonStyle(IconHoverButtonStyle())
                 }
                 .font(labelFont)
-
-                if tooShortBoostWord {
-                    HStack(alignment: .top, spacing: 6) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
-                        Text("Boost-only words need 4+ letters — shorter ones are ignored by the model. Add a “Wrong” word to make it an exact replacement instead.")
-                            .foregroundStyle(.orange)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .font(labelFont)
-                }
             }
 
             // Word list — outside SettingsCard so @Observable triggers correctly
@@ -1658,20 +1593,9 @@ private struct InlineSettingsView: View {
         }
     }
 
-    /// A boost-only entry (no "Wrong") under 4 letters: FluidAudio's rescorer
-    /// skips terms this short, so adding it would do nothing.
-    private var tooShortBoostWord: Bool {
-        newFrom.trimmingCharacters(in: .whitespaces).isEmpty
-            && (1...3).contains(newTo.trimmingCharacters(in: .whitespaces).count)
-    }
-
     private func addWord() {
-        guard !newTo.isEmpty, !tooShortBoostWord else { return }
-        if newFrom.isEmpty {
-            replacementService.addBoostWord(newTo)
-        } else {
-            replacementService.addReplacement(from: newFrom, to: newTo)
-        }
+        guard !newFrom.isEmpty, !newTo.isEmpty else { return }
+        replacementService.addReplacement(from: newFrom, to: newTo)
         newFrom = ""
         newTo = ""
     }
