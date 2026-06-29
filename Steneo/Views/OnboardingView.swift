@@ -35,6 +35,10 @@ final class OnboardingPresenter: NSObject, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         SettingsStore.shared.hasCompletedOnboarding = true
+        // A test recording could still be live if the user closed mid-try — stop it.
+        if RecordingManager.shared.isRecording || RecordingManager.shared.isStarting {
+            RecordingManager.shared.toggle()
+        }
         window = nil
     }
 }
@@ -52,7 +56,9 @@ struct OnboardingView: View {
     @State private var requestedMediaAuth = false
     @State private var warmedEncryption = false
 
-    private let lastStep = 4
+    // 0–4 = core flow (5 screens); 5–7 = optional "expert options".
+    private let coreLast = 4
+    private let expertLast = 7
 
     var body: some View {
         VStack(spacing: 0) {
@@ -60,50 +66,71 @@ struct OnboardingView: View {
                 switch step {
                 case 0: welcomeStep
                 case 1: permissionsStep
-                case 2: shortcutStep
-                case 3: preferencesStep
-                default: readyStep
+                case 2: tryItStep
+                case 3: controlStep
+                case 4: readyStep
+                case 5: expertTextStep
+                case 6: expertMoreStep
+                default: expertPrefsStep
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .padding(28)
 
             Divider()
-
-            HStack {
-                if step > 0 {
-                    Button("Back") { withAnimation { step -= 1 } }
-                        .buttonStyle(OnboardingSubtleButtonStyle())
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                HStack(spacing: 6) {
-                    ForEach(0...lastStep, id: \.self) { i in
-                        Circle()
-                            .fill(i == step ? Color.accentColor : Color.secondary.opacity(0.3))
-                            .frame(width: 6, height: 6)
-                    }
-                }
-                Spacer()
-                Button(step == lastStep ? "Done" : "Continue") {
-                    if step == lastStep { onFinish() } else { withAnimation { step += 1 } }
-                }
-                .keyboardShortcut(.defaultAction)
-                .buttonStyle(OnboardingPrimaryButtonStyle())
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 14)
-            // Nav chrome shouldn't draw a focus ring: on steps with no other
-            // focusable content (welcome, ready), the prominent button would
-            // otherwise auto-focus and show a ring on top of its accent fill.
-            .focusEffectDisabled()
+            navBar
         }
         .frame(width: 460, height: 580)
         .onAppear(perform: refresh)
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in refresh() }
     }
 
-    // MARK: Steps
+    // MARK: Navigation
+
+    private var navBar: some View {
+        HStack {
+            if step > 0 {
+                Button("Back") { withAnimation { step -= 1 } }
+                    .buttonStyle(OnboardingSubtleButtonStyle())
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if step <= coreLast {
+                HStack(spacing: 6) {
+                    ForEach(0...coreLast, id: \.self) { i in
+                        Circle()
+                            .fill(i == step ? Color.accentColor : Color.secondary.opacity(0.3))
+                            .frame(width: 6, height: 6)
+                    }
+                }
+            } else {
+                Text("Expert options · \(step - coreLast)/\(expertLast - coreLast)")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button(primaryLabel) {
+                switch step {
+                case coreLast, expertLast: onFinish()
+                default: withAnimation { step += 1 }
+                }
+            }
+            .keyboardShortcut(.defaultAction)
+            .buttonStyle(OnboardingPrimaryButtonStyle())
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+        .focusEffectDisabled()
+    }
+
+    private var primaryLabel: String {
+        switch step {
+        case coreLast: return "Start using Steneo"
+        case expertLast: return "Done"
+        default: return "Continue"
+        }
+    }
+
+    // MARK: 1 · Welcome
 
     private var welcomeStep: some View {
         VStack(spacing: 16) {
@@ -140,9 +167,11 @@ struct OnboardingView: View {
         }
     }
 
+    // MARK: 2 · Permissions
+
     private var permissionsStep: some View {
         VStack(alignment: .leading, spacing: 16) {
-            stepHeader("Permissions", "Steneo needs two permissions to work.")
+            stepHeader("Permissions", "Steneo needs two permissions to work. Granting them here means no nagging later.")
             permissionRow(
                 icon: "mic.fill",
                 title: "Microphone",
@@ -157,17 +186,15 @@ struct OnboardingView: View {
                 granted: axGranted,
                 action: requestAX
             )
-            Label("Spotify & Apple Music control is requested later, only the first time you record with pausing on.", systemImage: "info.circle")
+            Label("Spotify & Apple Music control is requested once, automatically, the first time it's needed.", systemImage: "info.circle")
                 .font(.caption).foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
-            Label("Your transcription history is encrypted on this Mac. The key is kept in your Keychain and never leaves the device — if macOS asks, choose Allow.", systemImage: "lock.fill")
+            Label("History is encrypted on this Mac; the key stays in your Keychain. If macOS asks, choose Allow.", systemImage: "lock.fill")
                 .font(.caption).foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer()
         }
         .onAppear {
-            // Create the history-encryption key now, during setup, so any one-time
-            // Keychain prompt happens here (explained above) — not later mid-use.
             if !warmedEncryption {
                 warmedEncryption = true
                 EncryptionService.shared.warm()
@@ -175,9 +202,84 @@ struct OnboardingView: View {
         }
     }
 
-    private var shortcutStep: some View {
+    // MARK: 3 · Try it + mic colours
+
+    private var tryItStep: some View {
         VStack(alignment: .leading, spacing: 14) {
-            stepHeader("Your shortcut", "Pick the key you press to start and stop recording. You can choose more than one.")
+            stepHeader("Try it", "Press Record and say a sentence. It stays in this window — nothing is pasted or saved.")
+            colorLegend
+            Divider().opacity(0.5)
+            testControl
+            if let t = recordingManager.testTranscript {
+                Text(t)
+                    .font(.body)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
+            }
+            Spacer()
+        }
+    }
+
+    private var colorLegend: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("What the menubar mic tells you:").font(.callout).foregroundStyle(.secondary)
+            HStack(spacing: 14) {
+                legendDot(Color(hex: "#FF9500"), "Starting")
+                legendDot(Color(hex: "#E04848"), "Recording")
+                legendDot(Color(hex: "#E6A23C"), "Working")
+                legendDot(Color(hex: "#34C759"), "Done")
+            }
+        }
+    }
+
+    private func legendDot(_ color: Color, _ label: String) -> some View {
+        HStack(spacing: 5) {
+            Circle().fill(color).frame(width: 10, height: 10)
+            Text(label).font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder private var testControl: some View {
+        if !recordingManager.isModelLoaded {
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.small)
+                Text("Speech model still downloading — try again in a moment.").foregroundStyle(.secondary)
+            }.font(.callout)
+        } else {
+            HStack(spacing: 12) {
+                Button {
+                    if recordingManager.isRecording || recordingManager.isStarting {
+                        recordingManager.toggle()
+                    } else {
+                        recordingManager.startTestRecording()
+                    }
+                } label: {
+                    Label(testActive ? "Stop" : "Record a test",
+                          systemImage: testActive ? "stop.fill" : "mic.fill")
+                }
+                .buttonStyle(OnboardingSubtleButtonStyle(bordered: true))
+                Text(testStatus).font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var testActive: Bool { recordingManager.isRecording || recordingManager.isStarting }
+
+    private var testStatus: String {
+        if recordingManager.isStarting { return "Starting…" }
+        if recordingManager.isRecording { return "Recording — pause to finish." }
+        if recordingManager.testTranscript != nil { return "Nice. That's exactly how it works." }
+        return "First time? macOS will ask for microphone access."
+    }
+
+    // MARK: 4 · How to record
+
+    private var controlStep: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            stepHeader("How to record", "Pick a shortcut — you can choose more than one.")
             ForEach(HotkeyChoice.allCases) { choice in
                 Toggle(isOn: Binding(
                     get: { settings.hotkeys.contains(choice) },
@@ -186,32 +288,92 @@ struct OnboardingView: View {
                         if on { updated.insert(choice) } else if updated.count > 1 { updated.remove(choice) }
                         settings.hotkeys = updated
                     }
-                )) {
-                    Text(choice.label)
-                }
+                )) { Text(choice.label) }
                 .toggleStyle(.checkbox)
             }
             if settings.hotkeys.contains(.f5) {
-                Label("For F5: enable “Use F1, F2, etc. as standard function keys” in System Settings → Keyboard.", systemImage: "info.circle")
+                Label("For F5: enable “Use F1, F2 as standard function keys” in System Settings → Keyboard.", systemImage: "info.circle")
                     .font(.caption).foregroundStyle(.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            Divider().opacity(0.5)
+            Text("You can start & stop three ways:").font(.callout).foregroundStyle(.secondary)
+            controlMethod("command", "Your shortcut", "The key(s) you picked above.")
+            controlMethod("cursorarrow.rays", "Right-click the menubar mic", "Starts or stops instantly.")
+            controlMethod("cursorarrow.click.2", "Left-click the mic, then hover", "Press the Record button in the panel header.")
             Spacer()
         }
     }
 
-    private var preferencesStep: some View {
+    // MARK: 5 · Ready
+
+    private var readyStep: some View {
+        VStack(spacing: 14) {
+            Spacer()
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 52)).foregroundStyle(.green)
+            Text("You're all set").font(.largeTitle).fontWeight(.semibold)
+            VStack(alignment: .leading, spacing: 9) {
+                howToRow("1.", "Click where you want the text.")
+                howToRow("2.", "\(shortcutSummary), or right-click the menubar mic, to start.")
+                howToRow("3.", "Speak. Pause, or trigger again, to finish.")
+                howToRow("4.", "Your text lands right at the cursor.")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
+            Toggle("Start Steneo at login", isOn: Binding(
+                get: { settings.launchAtLogin },
+                set: { settings.launchAtLogin = $0 }))
+            .toggleStyle(.checkbox)
+            Button("Show expert options →") { withAnimation { step = coreLast + 1 } }
+                .buttonStyle(OnboardingSubtleButtonStyle())
+                .foregroundStyle(.secondary)
+            Spacer()
+        }
+        .onAppear {
+            // Front-load the Spotify/Apple Music Automation prompt for everyone who
+            // reaches Ready (only does anything if pausing is on and a player runs).
+            if !requestedMediaAuth, settings.pauseMediaApps {
+                requestedMediaAuth = true
+                SystemAudioService.shared.requestMediaAutomationPermission()
+            }
+        }
+    }
+
+    // MARK: 6–8 · Expert options (optional)
+
+    private var expertTextStep: some View {
         VStack(alignment: .leading, spacing: 14) {
-            stepHeader("Preferences", "Sensible defaults — change any of these later in Settings.")
+            stepHeader("Smarter text", "On-device and off by default — flip these on in Settings → Text Output.")
+            featureRow("wand.and.stars", "Cleanup", "Rules instantly drops fillers (um, äh) and never changes your wording; AI does a smarter pass.")
+            featureRow("text.alignleft", "Format", "Turn raw dictation into Paragraphs or a Bullet list.")
+            Label("AI cleanup & formatting run via Apple Intelligence (formatting needs macOS 26).", systemImage: "lock.fill")
+                .font(.caption).foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer()
+        }
+    }
+
+    private var expertMoreStep: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            stepHeader("More ways to use it", "Discover these whenever you like.")
+            featureRow("hand.tap", "Push-to-talk", "Prefer holding? Settings → General → Activation → Hold: hold to record, release to stop.")
+            featureRow("waveform", "Transcribe a file", "Drag an audio file onto the panel — it's transcribed on-device too.")
+            featureRow("clock.arrow.circlepath", "History", "Your past transcriptions, encrypted on this Mac and searchable in the panel.")
+            Spacer()
+        }
+    }
+
+    private var expertPrefsStep: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            stepHeader("Preferences", "Sensible defaults — change any of these here or later in Settings.")
             Toggle("Mute media playback while recording", isOn: Binding(
                 get: { settings.silenceMediaWhileRecording },
                 set: { settings.silenceMediaWhileRecording = $0 }))
             Toggle("Pause Spotify & Apple Music while recording", isOn: Binding(
                 get: { settings.pauseMediaApps },
                 set: { settings.pauseMediaApps = $0 }))
-            Toggle("Start Steneo at login", isOn: Binding(
-                get: { settings.launchAtLogin },
-                set: { settings.launchAtLogin = $0 }))
             HStack {
                 Text("Check for updates")
                 Spacer()
@@ -227,38 +389,6 @@ struct OnboardingView: View {
                  : "No automatic network calls — only when you press Check Now.")
                 .font(.caption).foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
-            Spacer()
-        }
-        .onAppear {
-            // Front-load the Spotify/Apple Music Automation prompt during setup,
-            // so the first recording reacts instantly. Only does anything if
-            // pausing is on and a player is actually running.
-            if !requestedMediaAuth, settings.pauseMediaApps {
-                requestedMediaAuth = true
-                SystemAudioService.shared.requestMediaAutomationPermission()
-            }
-        }
-    }
-
-    private var readyStep: some View {
-        VStack(spacing: 16) {
-            Spacer()
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 56)).foregroundStyle(.green)
-            Text("You're all set")
-                .font(.largeTitle).fontWeight(.semibold)
-            VStack(alignment: .leading, spacing: 10) {
-                howToRow("1.", "Click into the text field where you want the text to appear.")
-                howToRow("2.", "\(shortcutSummary) to start recording.")
-                howToRow("3.", "Speak. Pause, or press again, to finish.")
-                howToRow("4.", "Your text lands right at the cursor.")
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(14)
-            .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
-            Text("Tip: right-click the menubar icon to start/stop, left-click for settings.")
-                .font(.caption).foregroundStyle(.tertiary)
-                .multilineTextAlignment(.center)
             Spacer()
         }
     }
@@ -295,6 +425,32 @@ struct OnboardingView: View {
         .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
     }
 
+    private func controlMethod(_ icon: String, _ title: String, _ desc: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: icon).frame(width: 22).foregroundStyle(.tint)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title).fontWeight(.medium)
+                Text(desc).font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func featureRow(_ icon: String, _ title: String, _ desc: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon).font(.title3).frame(width: 26).foregroundStyle(.tint)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).fontWeight(.medium)
+                Text(desc).font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
+    }
+
     private func howToRow(_ num: String, _ text: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(num).fontWeight(.semibold).foregroundStyle(.tint).frame(width: 18, alignment: .leading)
@@ -305,7 +461,7 @@ struct OnboardingView: View {
 
     private var shortcutSummary: String {
         let labels = HotkeyChoice.allCases.filter { settings.hotkeys.contains($0) }.map { $0.label }
-        return labels.first ?? "your shortcut"
+        return labels.first ?? "Press your shortcut"
     }
 
     // MARK: Permissions
@@ -368,5 +524,17 @@ private struct OnboardingSubtleButtonStyle: ButtonStyle {
             .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
             .onHover { hovering = $0 }
             .animation(.easeOut(duration: 0.12), value: hovering)
+    }
+}
+
+private extension Color {
+    init(hex: String) {
+        let scanner = Scanner(string: hex.hasPrefix("#") ? String(hex.dropFirst()) : hex)
+        var value: UInt64 = 0
+        scanner.scanHexInt64(&value)
+        self.init(
+            red: Double((value >> 16) & 0xFF) / 255,
+            green: Double((value >> 8) & 0xFF) / 255,
+            blue: Double(value & 0xFF) / 255)
     }
 }

@@ -20,8 +20,12 @@ final class RecordingManager {
     let historyService = HistoryService.shared
 
     private(set) var isRecording = false
-    private(set) var isStarting = false   // shortcut registered, engine spinning up (shows red)
+    private(set) var isStarting = false   // press registered, engine spinning up (shows orange — arming)
     private(set) var isPostProcessing = false   // post-record on-device LLM pass (AI cleanup / formatting) running
+    /// A self-contained test recording's transcript (onboarding "Try it") — shown in
+    /// the onboarding window only, never pasted or saved.
+    private(set) var testTranscript: String?
+    private var isTestMode = false
     private(set) var isModelLoading = false
     private(set) var modelLoadError: String?
     private(set) var inputLevel: Float = 0.0   // smoothed mic level [0,1] for the meter
@@ -130,6 +134,16 @@ final class RecordingManager {
         } else {
             startRecording()
         }
+    }
+
+    /// Start a one-off TEST recording for onboarding: records, transcribes, and
+    /// publishes `testTranscript` instead of pasting/saving. Triggers the microphone
+    /// permission prompt if it hasn't been asked yet.
+    func startTestRecording() {
+        guard !isRecording, !isStarting else { return }
+        isTestMode = true
+        testTranscript = nil
+        startRecording()
     }
 
     func startRecording() {
@@ -278,6 +292,17 @@ final class RecordingManager {
         // no per-buffer resampler warm-up that garbled short clips.
         let recorded = audioCaptureService.takeRecording()
         var finalText = await transcriptionService.stopTranscription(rawSamples: recorded.samples, rate: recorded.rate)
+
+        // Onboarding test recording: surface the raw transcript in the window only —
+        // never paste, clean up, format, or save to history.
+        if isTestMode {
+            isTestMode = false
+            testTranscript = finalText.isEmpty
+                ? "Didn't catch that — try again, a little closer to the mic."
+                : finalText
+            return
+        }
+
         // Capture duration BEFORE optional cleanup so WPM reflects speaking time,
         // not the cleanup pass.
         let duration = recordingStartTime.map { Date().timeIntervalSince($0) }
