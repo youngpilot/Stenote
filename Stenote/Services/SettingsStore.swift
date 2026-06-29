@@ -160,6 +160,11 @@ final class SettingsStore {
         }
     }
 
+    /// How the hotkey activates recording: Toggle (tap on/off) or Hold (push-to-talk).
+    var activationMode: ActivationMode {
+        didSet { UserDefaults.standard.set(activationMode.rawValue, forKey: "activationMode") }
+    }
+
     var politenessMode: Bool {
         didSet {
             UserDefaults.standard.set(politenessMode, forKey: "politenessMode")
@@ -258,6 +263,7 @@ final class SettingsStore {
 
     func resetToDefaults() {
         hotkeys = [.doubleRightOption]
+        activationMode = .toggle
         politenessMode = false
         prefixText = ""
         suffixText = ""
@@ -289,6 +295,7 @@ final class SettingsStore {
         } else {
             self.hotkeys = [.doubleRightOption]
         }
+        self.activationMode = ActivationMode(rawValue: ud.string(forKey: "activationMode") ?? "") ?? .toggle
         self.politenessMode = ud.bool(forKey: "politenessMode")
         self.suffixText = ud.string(forKey: "suffixText") ?? ""
         self.prefixText = ud.string(forKey: "prefixText") ?? ""

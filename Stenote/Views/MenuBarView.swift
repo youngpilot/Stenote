@@ -1169,6 +1169,26 @@ private struct InlineSettingsView: View {
                     .frame(minWidth: 220)
                 }
 
+                settingsRow("Activation") {
+                    Picker("", selection: Binding(
+                        get: { settings.activationMode },
+                        set: { settings.activationMode = $0 }
+                    )) {
+                        ForEach(ActivationMode.allCases) { m in
+                            Text(m.label).tag(m)
+                        }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                }
+
+                if settings.activationMode == .hold {
+                    Text("Push-to-talk: hold the shortcut to record, release to stop. Works best with F5 or a Space combo — a bare modifier like Right ⌥ can trigger accidentally.")
+                        .font(labelFont)
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
                 settingsRow("History preview") {
                     Picker("", selection: Binding(
                         get: { settings.historyPreviewLines },

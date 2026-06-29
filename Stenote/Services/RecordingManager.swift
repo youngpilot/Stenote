@@ -62,6 +62,18 @@ final class RecordingManager {
         hotkeyService.onToggle = { [weak self] in
             self?.toggle()
         }
+        // Push-to-talk (Hold activation mode): press starts, release stops.
+        hotkeyService.onPress = { [weak self] in
+            self?.startRecording()
+        }
+        hotkeyService.onRelease = { [weak self] in
+            guard let self else { return }
+            if self.isRecording {
+                Task { await self.stopRecording() }
+            } else if self.isStarting {
+                self.stopAfterStart = true   // released during start-up → honored once live
+            }
+        }
 
         // Wire silence timeout → auto-stop
         transcriptionService.onSilenceTimeout = { [weak self] in
