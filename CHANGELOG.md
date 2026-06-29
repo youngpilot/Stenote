@@ -2,6 +2,17 @@
 
 All notable changes to Steneo. Dates are release dates; versions follow the app's `MARKETING_VERSION`.
 
+## 1.3.0
+
+### Added
+- **On-device text formatting (opt-in)** — after dictation, optionally restructure your text right on your Mac: **Paragraphs** (breaks at topic shifts, wording kept) or **Bullets** (a clean list). Settings → Text Output → Format. Uses Apple's on-device model (needs Apple Intelligence, macOS 26+); falls back to leaving the text unchanged.
+- **Push-to-talk** — a new **Hold** activation mode: hold your shortcut to record, release to stop. Settings → General → Activation. (Works best with F5 or a Space combo.)
+
+### Changed
+- **Long recordings transcribe as you go** — finished parts are transcribed in the background at natural pauses, so the wait when you stop stays short no matter how long you spoke. Short recordings are unchanged.
+- **App icon fixed** — Steneo now shows its icon in Finder and on the disk image (the icon images were the wrong size, so none was being bundled).
+- **Cleaner settings** — removed the Model Boosting toggle (it had no effect in the current engine; your Wrong → Right corrections still apply every time) and some status text that never appeared.
+
 ## 1.2.0
 
 ### Added
