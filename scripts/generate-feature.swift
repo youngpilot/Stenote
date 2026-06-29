@@ -57,7 +57,7 @@ let subAttrs: [NSAttributedString.Key: Any] = [
     .font: NSFont.systemFont(ofSize: 20, weight: .regular),
     .foregroundColor: NSColor(white: 0.6, alpha: 1.0)
 ]
-let subtitle = "Voice-to-text for macOS" as NSString
+let subtitle = "Private, Fast and Accurate Voice-to-Text for macOS" as NSString
 let subSize = subtitle.size(withAttributes: subAttrs)
 let subX = CGFloat(width) / 2 - subSize.width / 2
 let subY = textY - subSize.height - 8
